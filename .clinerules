@@ -1,0 +1,28 @@
+# Wyrd project rules
+
+## What Wyrd is
+An AI game master that can't cheat. Muse Spark narrates; a TypeScript rule engine is the only thing allowed to change game state. Hidden secrets are sealed with a SHA-256 hash at game start and revealed at the end.
+
+## Structure
+- server/ : Node 24 + TypeScript + Express (ESM)
+  - server/src/game/ : pure game logic (types, state, rules, worlds). No network calls, no Express.
+  - server/src/ai/ : Muse Spark calls and the tool-calling loop
+  - server/src/http/ : Express routes
+- web/ : React + Vite + TypeScript (later)
+- scripts/ : one-off API test scripts. Do not modify.
+
+## Hard rules
+1. Only functions in server/src/game/rules.ts may change GameState. Everything else treats state as read-only.
+2. Never read or print .env. Use process.env.META_API_KEY on the server only.
+3. Never put API keys or API calls in web/.
+4. Always set the model explicitly: muse-spark-1.3.
+5. Game logic takes randomness as an injected function (rng) so tests can control it.
+6. Every rule function has vitest unit tests covering valid and invalid cases.
+7. Strict TypeScript. No `any`.
+8. Only change the files the task names. No unrelated refactors. No new dependencies unless the task allows them.
+9. Do not run git commands. The developer commits.
+
+## Commands
+- cd server; npm test
+- cd server; npx tsc --noEmit
+- The terminal is Windows PowerShell 5.1: chain commands with ; not &&
