@@ -6,7 +6,7 @@ export const sunkenCrypt: World = {
   startRoomId: "entrance",
   exitRoomId: "exit_gate",
   relicItemId: "lost_relic",
-  maxTurns: 30,
+  maxTurns: 40,
   relicCandidateRoomIds: ["ossuary", "flooded_chapel", "library"],
   trapCandidates: [
     { roomId: "hall", direction: "east" },

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import * as readline from "node:readline";
 import type { DiceRoll, GameState, World } from "../game/types.js";
 import { startGame } from "../game/state.js";
+import { nearMissMessage } from "../game/distance.js";
 import { newSalt, verify } from "../game/secrets.js";
 import { sunkenCrypt } from "../game/worlds/sunkenCrypt.js";
 import { runTurn, type TurnResult, type TurnSession } from "../ai/loop.js";
@@ -152,6 +153,10 @@ async function main(): Promise<void> {
         console.log("You won! You escaped with the Lost Relic.");
       } else {
         console.log("You lost. The crypt keeps you.");
+        const nearMiss = nearMissMessage(state, sunkenCrypt);
+        if (nearMiss !== null) {
+          console.log(nearMiss);
+        }
       }
       console.log(formatRelicReveal(state, sunkenCrypt));
       console.log(formatTrapReveal(state, sunkenCrypt));

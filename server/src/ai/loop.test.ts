@@ -312,7 +312,12 @@ describe("GAME_MASTER_PROMPT playtest rules", () => {
     expect(GAME_MASTER_PROMPT).toContain(
       'look and examine are free: they do not count as the one action, so "look around and go north" should look AND move.',
     );
-    expect(GAME_MASTER_PROMPT).toContain("except look and examine are free");
+  });
+
+  it("locks the action-sequence rule", () => {
+    expect(GAME_MASTER_PROMPT).toContain("perform up to 3 actions in order, one tool call each");
+    expect(GAME_MASTER_PROMPT).toContain("Stop at the first action that fails");
+    expect(GAME_MASTER_PROMPT).toContain("never ask 'Shall I");
   });
 });
 

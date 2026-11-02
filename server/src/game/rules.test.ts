@@ -726,6 +726,24 @@ describe("sneak", () => {
     expect(state).toEqual(before);
     expect(state.turn).toBe(0);
   });
+
+  it("rejects a second sneak past the same enemy without changing state", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    // d20=17 succeeds (target 13).
+    const first = sneak(state, world, "goblin", seqRng([0.84]));
+    expect(first.ok).toBe(true);
+    expect(state.flags["sneaked:entrance"]).toBe(true);
+    const before = snapshot(state);
+    const second = sneak(state, world, "goblin", seqRng([0.84]));
+    expect(second.ok).toBe(false);
+    expect(second.action).toBe("sneak");
+    expect(second.reason).toBe("You're already past the Goblin.");
+    expect(second.rolls).toEqual([]);
+    expect(second.events).toEqual([]);
+    expect(state).toEqual(before);
+    expect(state.turn).toBe(1);
+  });
 });
 
 describe("endTurn / win / lose", () => {
@@ -807,6 +825,55 @@ describe("endTurn / win / lose", () => {
     expect(() => attack(state, world, "goblin", seqRng([0.95, 0.5]))).toThrow(
       /exhausted/,
     );
+  });
+
+  it("warns when exactly 10 turns are left", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.turn = world.maxTurns - 11;
+    const events = endTurn(state, world);
+    expect(state.turn).toBe(world.maxTurns - 10);
+    expect(state.status).toBe("playing");
+    expect(events).toEqual(["Your torch burns low: 10 turns left."]);
+  });
+
+  it("warns when exactly 5 turns are left", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.turn = world.maxTurns - 6;
+    const events = endTurn(state, world);
+    expect(state.turn).toBe(world.maxTurns - 5);
+    expect(state.status).toBe("playing");
+    expect(events).toEqual(["Your torch gutters: 5 turns left!"]);
+  });
+
+  it("stays quiet on other turn counts", () => {
+    const world = makeWorld();
+    for (const turnsLeft of [11, 9, 6, 4, 1]) {
+      const state = makeState(world);
+      state.turn = world.maxTurns - turnsLeft - 1;
+      const events = endTurn(state, world);
+      expect(state.status).toBe("playing");
+      expect(events).toEqual([]);
+    }
+  });
+
+  it("does not add a torch warning to a terminal event", () => {
+    const timeoutWorld = makeWorld();
+    const timedOut = makeState(timeoutWorld);
+    timedOut.turn = timeoutWorld.maxTurns - 1;
+    expect(endTurn(timedOut, timeoutWorld)).toEqual(["You ran out of time."]);
+
+    const diedWorld = makeWorld();
+    const died = makeState(diedWorld);
+    died.hp = 0;
+    expect(endTurn(died, diedWorld)).toEqual(["You died."]);
+
+    const wonWorld = makeWorld();
+    const won = makeState(wonWorld);
+    won.inventory.push("relic");
+    won.currentRoomId = "treasure";
+    expect(endTurn(won, wonWorld)).toEqual(["You won!"]);
   });
 });
 

@@ -21,6 +21,7 @@ An AI game master that can't cheat. Muse Spark narrates; a TypeScript rule engin
 7. Strict TypeScript. No `any`.
 8. Only change the files the task names. No unrelated refactors. No new dependencies unless the task allows them.
 9. Do not run git commands. The developer commits.
+10. Any frontend work must follow docs/UI_STYLE.md (the V3 "Kinetic fate" style).
 
 ## Commands
 - cd server; npm test

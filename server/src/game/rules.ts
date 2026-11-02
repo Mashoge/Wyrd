@@ -76,6 +76,13 @@ export function endTurn(state: GameState, world: World): string[] {
     state.status = "lost";
     return ["You ran out of time."];
   }
+  const turnsLeft = world.maxTurns - state.turn;
+  if (turnsLeft === 10) {
+    return ["Your torch burns low: 10 turns left."];
+  }
+  if (turnsLeft === 5) {
+    return ["Your torch gutters: 5 turns left!"];
+  }
   return [];
 }
 
@@ -325,6 +332,9 @@ export function sneak(
   }
   if (enemy.defeated) {
     return reject("sneak", `The ${enemy.name} is already defeated.`);
+  }
+  if (state.flags[`sneaked:${room.id}`] === true) {
+    return reject("sneak", `You're already past the ${enemy.name}.`);
   }
   const rolls: ToolResult["rolls"] = [];
   const events: string[] = [];
