@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wyrd game screen, kinetic fate</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&amp;family=EB+Garamond:ital,wght@0,400;0,500;1,400&amp;family=Inter:wght@400;500;600&amp;family=Noto+Sans+Runic&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#120E17}
+a{color:#D9A6FF}a:hover{color:#F4EFF6}
+.title{font-family:'Cinzel',Georgia,serif;font-weight:800;letter-spacing:0.06em;text-transform:uppercase}
+.rune{font-family:'Noto Sans Runic',serif}
+.torn{clip-path:polygon(0 0,100% 0,100% 88%,95% 100%,0 100%)}
+.brush{clip-path:polygon(4% 0,100% 0,96% 100%,0 100%)}
+.btn{font-family:'Inter',sans-serif;font-size:14px;font-weight:600;border:0;cursor:pointer;padding:12px 24px;min-height:44px;clip-path:polygon(6% 0,100% 0,94% 100%,0 100%)}
+</style>
+</head>
+<body>
+<div style="min-height:100vh;background:#120E17;color:#F4EFF6;font-family:'Inter',system-ui,sans-serif;box-sizing:border-box;padding:24px 28px 32px">
+<div style="max-width:1440px;margin:0 auto;display:flex;flex-direction:column;gap:20px">
+
+<header style="display:flex;flex-wrap:wrap;align-items:center;gap:16px;justify-content:space-between">
+<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+<div class="title brush" style="background:#B44DFF;color:#120E17;font-size:34px;line-height:1;padding:12px 34px 10px">Wyrd</div>
+<div style="display:flex;flex-direction:column;gap:2px">
+<div class="title" style="font-size:20px;color:#F4EFF6">The Sunken Crypt</div>
+<div style="font-family:'EB Garamond',serif;font-style:italic;font-size:15px;color:#B9AEC0">Find the Lost Relic. Escape through the gate.</div>
+</div>
+</div>
+<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+<div style="display:flex;align-items:center;gap:12px">
+<svg width="46" height="46" viewBox="0 0 48 48" role="img" aria-label="Wax seal, fate sealed"><path d="M24 2 L43 13 L43 35 L24 46 L5 35 L5 13 Z" fill="#3A2848" stroke="#B44DFF" stroke-width="2"></path><text x="24" y="30" text-anchor="middle" font-size="16" fill="#F4EFF6" class="rune">ᚹ</text></svg>
+<div style="display:flex;flex-direction:column">
+<span class="title" style="font-size:12px;color:#B9AEC0">Fate sealed</span>
+<span style="font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#F4EFF6">5666ea…7b36e</span>
+</div>
+</div>
+<button class="btn" style="background:#2A2133;color:#F4EFF6">Inspector</button>
+</div>
+</header>
+
+<div class="rune" aria-hidden="true" style="color:#5B4A66;font-size:14px;letter-spacing:1.2em;text-align:center;white-space:nowrap;overflow:hidden">ᚹ ᚣ ᚱ ᛞ ᛫ ᚠ ᚨ ᛏ ᛖ ᛫ ᚹ ᚣ ᚱ ᛞ ᛫ ᚠ ᚨ ᛏ ᛖ ᛫ ᚹ ᚣ ᚱ ᛞ</div>
+
+<div style="display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start">
+
+<main style="flex:999 1 620px;min-width:0;display:flex;flex-direction:column;gap:16px">
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="align-self:flex-end;max-width:70%;font-family:'EB Garamond',serif;font-style:italic;font-size:17px;color:#D9A6FF">— I sneak into the den and grab the silver coin</div>
+<p style="margin:0;font-family:'EB Garamond',serif;font-size:18px;line-height:1.7;color:#A99E8A;max-width:66ch">You slip the silver coin into your pack. The goblin keeps muttering its count, too busy losing track to notice you.</p>
+</div>
+
+<div style="align-self:flex-end;max-width:70%;font-family:'EB Garamond',serif;font-style:italic;font-size:17px;color:#D9A6FF">— Attack the goblin with my dagger</div>
+
+<section aria-label="Dice result" style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+<div class="title brush" style="background:#B44DFF;color:#120E17;font-size:58px;line-height:1;padding:14px 34px 10px">17</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<div class="title" style="font-size:22px;color:#F4EFF6">Attack roll · <span style="color:#4DE8B5">Hit</span></div>
+<div style="font-size:14px;color:#B9AEC0">d20 rolled 17 · needed 9+ (Rusty Dagger +1) · damage 3 + 2 = 5</div>
+</div>
+</section>
+
+<article style="background:#1A1421;color:#F4EFF6;padding:28px 32px;display:flex;flex-direction:column;gap:14px">
+<p style="margin:0;font-family:'EB Garamond',serif;font-size:21px;line-height:1.65;max-width:62ch"><span class="title" style="float:left;font-size:54px;line-height:0.9;padding:4px 10px 0 0;color:#B44DFF">Y</span>our dagger finds the gap under the goblin's ribs. It shrieks, scattering coins across the bones, and collapses mid-count. Something heavy clatters free from its belt: an iron key, cold and pitted.</p>
+<div style="display:flex;flex-wrap:wrap;gap:10px;font-family:'Inter',sans-serif;font-size:12px;font-weight:600">
+<span style="border:1.5px solid #B44DFF;color:#E8CCFF;padding:4px 12px">Goblin defeated</span>
+<span style="border:1.5px solid #B44DFF;color:#E8CCFF;padding:4px 12px">Iron Key dropped</span>
+</div>
+</article>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div class="title" style="font-size:12px;color:#B9AEC0">Threads you could pull</div>
+<div style="display:flex;flex-wrap:wrap;gap:10px">
+<button class="btn" style="background:#B44DFF;color:#120E17">Pick up the Iron Key</button>
+<button class="btn" style="background:#2A2133;color:#F4EFF6">Go north</button>
+<button class="btn" style="background:#2A2133;color:#F4EFF6">Examine the coins</button>
+</div>
+</div>
+
+<form style="display:flex;gap:10px;align-items:stretch;flex-wrap:wrap" aria-label="Your action">
+<label for="act2" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">What do you do?</label>
+<input id="act2" type="text" placeholder="I take the key and head for the gate" style="flex:1;min-width:220px;min-height:50px;box-sizing:border-box;background:#0C0910;border:0;border-bottom:2px solid #B44DFF;color:#F4EFF6;font-family:'EB Garamond',serif;font-size:19px;padding:0 16px;outline:none">
+<button type="button" aria-label="Speak your action" class="btn" style="background:#2A2133;color:#F4EFF6;padding:0 18px;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg></button>
+<button type="submit" class="btn title" style="background:#B44DFF;color:#120E17;font-size:16px;padding:0 30px">Act</button>
+</form>
+</main>
+
+<aside style="flex:1 1 340px;min-width:0;display:flex;flex-direction:column;gap:16px">
+
+<section aria-label="Enemy" style="background:#1A1421;display:flex;flex-direction:column;gap:10px;padding:18px 20px">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+<div class="title" style="font-size:24px;color:#F4EFF6">Goblin</div>
+<span class="title" style="color:#FF6B5B;font-size:12px;border:1.5px solid #FF6B5B;padding:3px 10px;transform:rotate(-4deg)">Defeated</span>
+</div>
+<div class="torn" style="height:140px;background:#241B2D;display:flex;align-items:center;justify-content:center;color:#9C8FA6;font-size:13px">[Muse Image portrait]</div>
+<div style="font-family:'EB Garamond',serif;font-size:16px;color:#B9AEC0;font-style:italic">Keeps counting its coins and losing track.</div>
+</section>
+
+<section aria-label="You" style="background:#1A1421;padding:18px 20px;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;justify-content:space-between;align-items:baseline">
+<div class="title" style="font-size:18px">You</div>
+<div style="font-size:13px;color:#B9AEC0">HP 8 / 10</div>
+</div>
+<div style="display:flex;gap:6px" aria-label="8 of 10 health">
+<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-8-5-8-11a4.5 4.5 0 0 1 8-3 4.5 4.5 0 0 1 8 3c0 6-8 11-8 11z" fill="#FF6B5B"></path></svg><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-8-5-8-11a4.5 4.5 0 0 1 8-3 4.5 4.5 0 0 1 8 3c0 6-8 11-8 11z" fill="#FF6B5B"></path></svg><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-8-5-8-11a4.5 4.5 0 0 1 8-3 4.5 4.5 0 0 1 8 3c0 6-8 11-8 11z" fill="#FF6B5B"></path></svg><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-8-5-8-11a4.5 4.5 0 0 1 8-3 4.5 4.5 0 0 1 8 3c0 6-8 11-8 11z" fill="#FF6B5B"></path></svg><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-8-5-8-11a4.5 4.5 0 0 1 8-3 4.5 4.5 0 0 1 8 3c0 6-8 11-8 11z" fill="#FF6B5B"></path></svg><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-8-5-8-11a4.5 4.5 0 0 1 8-3 4.5 4.5 0 0 1 8 3c0 6-8 11-8 11z" fill="#FF6B5B"></path></svg><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-8-5-8-11a4.5 4.5 0 0 1 8-3 4.5 4.5 0 0 1 8 3c0 6-8 11-8 11z" fill="#FF6B5B"></path></svg><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-8-5-8-11a4.5 4.5 0 0 1 8-3 4.5 4.5 0 0 1 8 3c0 6-8 11-8 11z" fill="#FF6B5B"></path></svg><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-8-5-8-11a4.5 4.5 0 0 1 8-3 4.5 4.5 0 0 1 8 3c0 6-8 11-8 11z" fill="none" stroke="#5B4A66" stroke-width="1.5"></path></svg><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-8-5-8-11a4.5 4.5 0 0 1 8-3 4.5 4.5 0 0 1 8 3c0 6-8 11-8 11z" fill="none" stroke="#5B4A66" stroke-width="1.5"></path></svg>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:baseline">
+<div style="font-size:13px;color:#B9AEC0">Thread of fate</div>
+<div style="font-size:13px;color:#B9AEC0">21 turns left</div>
+</div>
+<svg viewBox="0 0 300 24" width="100%" height="24" role="img" aria-label="Thread of fate, 21 of 30 turns left"><path d="M2 12 C40 6 70 18 110 12 S170 6 210 12" fill="none" stroke="#B44DFF" stroke-width="3" stroke-linecap="round"></path><path d="M210 12 l10 -5 M210 12 l12 2 M210 12 l9 6" stroke="#B44DFF" stroke-width="1.5" stroke-linecap="round"></path><path d="M224 12 C250 10 270 14 298 12" fill="none" stroke="#3E3247" stroke-width="2" stroke-dasharray="3 5"></path></svg>
+<div style="display:flex;flex-direction:column;gap:6px">
+<div class="title" style="font-size:12px;color:#B9AEC0">Satchel</div>
+<div style="font-family:'EB Garamond',serif;font-size:17px;line-height:1.55">Rusty Dagger <span style="font-family:'Inter',sans-serif;font-size:12px;color:#B9AEC0">+1 attack · +1 damage</span><br>Silver Coin<br>Healing Draught <span style="font-family:'Inter',sans-serif;font-size:12px;color:#B9AEC0">restores 4</span></div>
+</div>
+</section>
+
+<section aria-label="Ledger of fate" style="background:#1A1421;padding:18px 20px;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;justify-content:space-between;align-items:baseline">
+<div class="title" style="font-size:18px">Ledger of fate</div>
+<div style="font-size:12px;color:#B9AEC0">every claim is checked</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px;font-family:'EB Garamond',serif;font-size:16px;line-height:1.4">
+<div style="display:flex;gap:10px"><span style="color:#4DE8B5;font-family:'Inter',sans-serif">✓</span><span>Took the Silver Coin</span></div>
+<div style="display:flex;gap:10px;align-items:center;position:relative;padding:4px 0">
+<span style="color:#FF6B5B;font-family:'Inter',sans-serif">✗</span><span style="color:#A99E8A;text-decoration:line-through">Claimed a Legendary Sword</span>
+<span class="title" style="margin-left:auto;color:#FF6B5B;border:2px solid #FF6B5B;font-size:12px;padding:2px 10px;transform:rotate(-8deg)">Refused</span>
+</div>
+<div style="display:flex;gap:10px"><span style="color:#4DE8B5;font-family:'Inter',sans-serif">✓</span><span>Struck the Goblin</span></div>
+</div>
+</section>
+
+<section aria-label="Goal" style="background:#1A1421;padding:18px 20px;display:flex;flex-direction:column;gap:8px">
+<div class="title" style="font-size:18px">Your wyrd</div>
+<div style="font-family:'EB Garamond',serif;font-size:17px;line-height:1.75"><span style="color:#4DE8B5">✓</span> Find the iron key<br><span style="color:#5B4A66">○</span> Find the Lost Relic<br><span style="color:#5B4A66">○</span> Escape through the gate</div>
+</section>
+
+</aside>
+</div>
+</div>
+</div>
+</body>
+</html>
