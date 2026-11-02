@@ -42,6 +42,8 @@ export interface World {
   rooms: Record<string, Room>;
   items: Record<string, Item>;
   enemies: Record<string, Enemy>;
+  relicCandidateRoomIds: string[];
+  trapCandidates: { roomId: string; direction: string }[];
 }
 
 export type GameStatus = "playing" | "won" | "lost";

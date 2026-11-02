@@ -10,6 +10,8 @@ function makeTestWorld(): World {
     exitRoomId: "treasure",
     relicItemId: "torch",
     maxTurns: 20,
+    relicCandidateRoomIds: [],
+    trapCandidates: [],
     rooms: {
       entrance: {
         id: "entrance",

@@ -21,6 +21,8 @@ function makeWorld(): World {
     exitRoomId: "treasure",
     relicItemId: "relic",
     maxTurns: 20,
+    relicCandidateRoomIds: [],
+    trapCandidates: [],
     rooms: {
       entrance: {
         id: "entrance",
