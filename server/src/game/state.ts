@@ -1,4 +1,5 @@
-import type { GameState, World } from "./types.js";
+import { chooseSecrets, commit } from "./secrets.js";
+import type { GameState, Rng, World } from "./types.js";
 
 export function createGameState(world: World, sessionId: string): GameState {
   return {
@@ -14,5 +15,28 @@ export function createGameState(world: World, sessionId: string): GameState {
     flags: {},
     turn: 0,
     status: "playing",
+    secrets: { relicRoomId: "", trap: { roomId: "", direction: "" } },
+    salt: "",
+    commitment: "",
   };
+}
+
+export function startGame(
+  world: World,
+  sessionId: string,
+  rng: Rng,
+  salt: string,
+): GameState {
+  const state = createGameState(world, sessionId);
+  const secrets = chooseSecrets(world, rng);
+  const room = state.rooms[secrets.relicRoomId];
+  if (room === undefined) {
+    throw new Error(`Relic room "${secrets.relicRoomId}" does not exist.`);
+  }
+  // Place the relic in the state's room copy only; never mutate the world.
+  room.items.push(world.relicItemId);
+  state.secrets = secrets;
+  state.salt = salt;
+  state.commitment = commit(secrets, salt);
+  return state;
 }

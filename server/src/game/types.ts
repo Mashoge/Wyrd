@@ -46,6 +46,11 @@ export interface World {
   trapCandidates: { roomId: string; direction: string }[];
 }
 
+export interface Secrets {
+  relicRoomId: string;
+  trap: { roomId: string; direction: string };
+}
+
 export type GameStatus = "playing" | "won" | "lost";
 
 export interface GameState {
@@ -61,6 +66,13 @@ export interface GameState {
   flags: Record<string, boolean>;
   turn: number;
   status: GameStatus;
+  // NOTE: secrets and salt are server-only. They must never be sent to the
+  // player before the game ends. Only `commitment` may be shared at game
+  // start; secrets + salt are revealed at the end so the player (browser)
+  // can recompute and verify the commitment.
+  secrets: Secrets;
+  salt: string;
+  commitment: string;
 }
 
 export type Rng = () => number;

@@ -106,7 +106,7 @@ describe("move", () => {
     const world = makeWorld();
     const state = makeState(world);
     state.enemies["goblin"]!.defeated = true;
-    const result = move(state, world, "north");
+    const result = move(state, world, "north", seqRng([]));
     expect(result.ok).toBe(true);
     expect(state.currentRoomId).toBe("hallway");
     expect(state.lastRoomId).toBe("entrance");
@@ -118,7 +118,7 @@ describe("move", () => {
     const world = makeWorld();
     const state = makeState(world);
     const before = snapshot(state);
-    const result = move(state, world, "west");
+    const result = move(state, world, "west", seqRng([]));
     expect(result.ok).toBe(false);
     expect(result.reason).toContain("west");
     expect(state).toEqual(before);
@@ -128,7 +128,7 @@ describe("move", () => {
     const world = makeWorld();
     const state = makeState(world);
     const before = snapshot(state);
-    const result = move(state, world, "east");
+    const result = move(state, world, "east", seqRng([]));
     expect(result.ok).toBe(false);
     expect(result.reason).toContain("locked");
     expect(state).toEqual(before);
@@ -138,7 +138,7 @@ describe("move", () => {
     const world = makeWorld();
     const state = makeState(world);
     const before = snapshot(state);
-    const result = move(state, world, "north");
+    const result = move(state, world, "north", seqRng([]));
     expect(result.ok).toBe(false);
     expect(result.reason).toBe("The Goblin blocks your way.");
     expect(state).toEqual(before);
@@ -149,7 +149,7 @@ describe("move", () => {
     const state = makeState(world);
     state.currentRoomId = "entrance";
     state.lastRoomId = "hallway";
-    const result = move(state, world, "north");
+    const result = move(state, world, "north", seqRng([]));
     expect(result.ok).toBe(true);
     expect(state.currentRoomId).toBe("hallway");
     expect(state.lastRoomId).toBe("entrance");
@@ -162,7 +162,7 @@ describe("move", () => {
     state.currentRoomId = "entrance";
     state.lastRoomId = "vault";
     const before = snapshot(state);
-    const result = move(state, world, "north");
+    const result = move(state, world, "north", seqRng([]));
     expect(result.ok).toBe(false);
     expect(result.reason).toBe("The Goblin blocks your way.");
     expect(state).toEqual(before);
@@ -175,7 +175,7 @@ describe("move", () => {
     state.currentRoomId = "entrance";
     state.lastRoomId = "hallway";
     const before = snapshot(state);
-    const result = move(state, world, "north");
+    const result = move(state, world, "north", seqRng([]));
     expect(result.ok).toBe(false);
     expect(result.reason).toBe("The doors are sealed.");
     expect(state).toEqual(before);
@@ -186,7 +186,7 @@ describe("move", () => {
     const world = makeWorld();
     const state = makeState(world);
     state.flags["sneaked:entrance"] = true;
-    const result = move(state, world, "north");
+    const result = move(state, world, "north", seqRng([]));
     expect(result.ok).toBe(true);
     expect(state.currentRoomId).toBe("hallway");
   });
@@ -195,7 +195,7 @@ describe("move", () => {
     const world = makeWorld();
     const state = makeState(world);
     state.enemies["goblin"]!.defeated = true;
-    const result = move(state, world, "north");
+    const result = move(state, world, "north", seqRng([]));
     expect(result.ok).toBe(true);
     expect(state.currentRoomId).toBe("hallway");
   });
@@ -203,7 +203,7 @@ describe("move", () => {
   it("rejected moves do not advance the turn", () => {
     const world = makeWorld();
     const state = makeState(world);
-    move(state, world, "west");
+    move(state, world, "west", seqRng([]));
     expect(state.turn).toBe(0);
   });
 
@@ -211,10 +211,10 @@ describe("move", () => {
     const world = makeWorld();
     const state = makeState(world);
     state.enemies["goblin"]!.defeated = true;
-    const first = move(state, world, "North");
+    const first = move(state, world, "North", seqRng([]));
     expect(first.ok).toBe(true);
     expect(state.currentRoomId).toBe("hallway");
-    const second = move(state, world, " north ");
+    const second = move(state, world, " north ", seqRng([]));
     expect(second.ok).toBe(true);
     expect(state.currentRoomId).toBe("treasure");
   });
@@ -504,8 +504,8 @@ describe("endTurn / win / lose", () => {
     const world = makeWorld();
     const state = makeState(world);
     state.enemies["goblin"]!.defeated = true;
-    move(state, world, "north");
-    move(state, world, "north");
+    move(state, world, "north", seqRng([]));
+    move(state, world, "north", seqRng([]));
     expect(state.currentRoomId).toBe("treasure");
     const result = pickUp(state, world, "relic", seqRng([]));
     expect(result.ok).toBe(true);
@@ -562,12 +562,12 @@ describe("endTurn / win / lose", () => {
     const state = makeState(world);
     state.status = "won";
     const before = snapshot(state);
-    expect(move(state, world, "north").ok).toBe(false);
+    expect(move(state, world, "north", seqRng([])).ok).toBe(false);
     expect(pickUp(state, world, "torch", seqRng([])).ok).toBe(false);
     expect(useItem(state, world, "key", "east").ok).toBe(false);
     expect(attack(state, world, "goblin", seqRng([0.95])).ok).toBe(false);
     expect(sneak(state, world, "goblin", seqRng([0.95])).ok).toBe(false);
-    expect(move(state, world, "north").reason).toBe("The game is over.");
+    expect(move(state, world, "north", seqRng([])).reason).toBe("The game is over.");
     expect(state).toEqual(before);
   });
 
@@ -578,6 +578,83 @@ describe("endTurn / win / lose", () => {
     expect(() => attack(state, world, "goblin", seqRng([0.95, 0.5]))).toThrow(
       /exhausted/,
     );
+  });
+});
+
+describe("trap", () => {
+  function makeTrapState(world: World): GameState {
+    const state = makeState(world);
+    state.enemies["goblin"]!.defeated = true;
+    state.secrets = {
+      relicRoomId: "treasure",
+      trap: { roomId: "entrance", direction: "north" },
+    };
+    return state;
+  }
+
+  it("fires once with the right damage", () => {
+    const world = makeWorld();
+    const state = makeTrapState(world);
+    // d4: 1 + floor(0.5 * 4) = 3.
+    const result = move(state, world, "north", seqRng([0.5]));
+    expect(result.ok).toBe(true);
+    expect(result.rolls).toEqual([{ purpose: "trap", sides: 4, value: 3 }]);
+    expect(state.hp).toBe(7);
+    expect(state.flags["trap_sprung"]).toBe(true);
+    expect(result.events).toContain("A trap springs! You take 3 damage.");
+    expect(state.currentRoomId).toBe("hallway");
+    expect(state.turn).toBe(1);
+  });
+
+  it("does not fire on a second pass", () => {
+    const world = makeWorld();
+    const state = makeTrapState(world);
+    move(state, world, "north", seqRng([0.5]));
+    // Walk back south, then north again through the same trapped exit.
+    state.lastRoomId = null;
+    state.currentRoomId = "entrance";
+    const second = move(state, world, "north", seqRng([]));
+    expect(second.ok).toBe(true);
+    expect(second.rolls).toEqual([]);
+    expect(state.hp).toBe(7);
+    expect(second.events).not.toContain(
+      "A trap springs! You take 3 damage.",
+    );
+  });
+
+  it("does not fire on other exits", () => {
+    const world = makeWorld();
+    const state = makeTrapState(world);
+    // hallway north -> treasure is not the trapped exit.
+    state.currentRoomId = "hallway";
+    state.lastRoomId = "entrance";
+    const result = move(state, world, "north", seqRng([]));
+    expect(result.ok).toBe(true);
+    expect(result.rolls).toEqual([]);
+    expect(state.hp).toBe(10);
+    expect(state.flags["trap_sprung"]).toBeUndefined();
+  });
+
+  it("matches the trapped exit after direction normalization", () => {
+    const world = makeWorld();
+    const state = makeTrapState(world);
+    const result = move(state, world, " North ", seqRng([0.0]));
+    expect(result.rolls).toEqual([{ purpose: "trap", sides: 4, value: 1 }]);
+    expect(state.hp).toBe(9);
+    expect(result.events).toContain("A trap springs! You take 1 damage.");
+  });
+
+  it("a trap can kill the player", () => {
+    const world = makeWorld();
+    const state = makeTrapState(world);
+    state.hp = 1;
+    // d4 = 1 + floor(0.99 * 4) = 4, clamped at 0.
+    const result = move(state, world, "north", seqRng([0.99]));
+    expect(result.ok).toBe(true);
+    expect(state.hp).toBe(0);
+    expect(state.status).toBe("lost");
+    expect(result.events).toContain("A trap springs! You take 4 damage.");
+    expect(result.events).toContain("You died.");
   });
 });
 

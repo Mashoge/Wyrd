@@ -58,7 +58,12 @@ function enemyCounterattack(
   }
 }
 
-export function move(state: GameState, world: World, rawDirection: string): ToolResult {
+export function move(
+  state: GameState,
+  world: World,
+  rawDirection: string,
+  rng: Rng,
+): ToolResult {
   if (state.status !== "playing") {
     return gameOverResult("move");
   }
@@ -89,9 +94,24 @@ export function move(state: GameState, world: World, rawDirection: string): Tool
   state.lastRoomId = state.currentRoomId;
   state.currentRoomId = exit.to;
   const destName = state.rooms[exit.to]?.name ?? exit.to;
+  const rolls: ToolResult["rolls"] = [];
   const events = [`You moved ${direction} to the ${destName}.`];
+  // The trap triggers when the player moves through the exit matching
+  // state.secrets.trap (origin room + normalized direction), at most once.
+  const originId = state.lastRoomId;
+  if (
+    state.flags["trap_sprung"] !== true &&
+    originId === state.secrets.trap.roomId &&
+    direction === normalizeDirection(state.secrets.trap.direction)
+  ) {
+    const trapRoll = rollDie(4, rng, "trap");
+    rolls.push(trapRoll);
+    state.hp = Math.max(0, state.hp - trapRoll.value);
+    state.flags["trap_sprung"] = true;
+    events.push(`A trap springs! You take ${trapRoll.value} damage.`);
+  }
   events.push(...endTurn(state, world));
-  return { ok: true, action: "move", rolls: [], events };
+  return { ok: true, action: "move", rolls, events };
 }
 
 export function pickUp(state: GameState, world: World, itemId: string, rng: Rng): ToolResult {
