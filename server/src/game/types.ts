@@ -81,6 +81,8 @@ export interface DiceRoll {
   purpose: string;
   sides: number;
   value: number;
+  target: number;
+  success: boolean;
 }
 
 export interface ToolResult {

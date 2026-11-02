@@ -4,6 +4,8 @@ import type { GameState, Rng, World } from "../game/types.js";
 import { sunkenCrypt } from "../game/worlds/sunkenCrypt.js";
 import type { AssistantMessage, ChatMessage, ToolChoice } from "./client.js";
 import { runTurn, type TurnHistoryEntry } from "./loop.js";
+import { GAME_MASTER_PROMPT } from "./prompt.js";
+import { formatRelicReveal, formatRoll, formatTrapReveal } from "../cli/play.js";
 
 function seqRng(values: number[]): Rng {
   let i = 0;
@@ -249,6 +251,98 @@ describe("runTurn caps and fallback", () => {
       runTurn({ state, world, history }, "hello", { client: failing, rng: seqRng([]) }),
     ).rejects.toThrow("early boom");
     expect(history).toEqual([]);
+  });
+
+  it("a claimed item leads to a pick_up call that is visibly rejected", async () => {
+    const { state, world } = freshGame();
+    state.currentRoomId = "entrance";
+    const before = structuredClone(state);
+    const fake = new FakeClient([
+      toolMsg("c1", "pick_up", { item_id: "diamond_crown" }),
+      { content: "There is no such treasure here, only damp stone." },
+    ]);
+    const result = await runTurn(
+      { state, world, history: [] },
+      "I found a diamond crown!",
+      { client: fake, rng: seqRng([]) },
+    );
+    expect(result.toolLog).toHaveLength(1);
+    expect(result.toolLog[0]?.name).toBe("pick_up");
+    expect(result.toolLog[0]?.result.ok).toBe(false);
+    expect(state).toEqual(before);
+    const toolReply = fake.requests[1]?.messages.find((m) => m.role === "tool");
+    expect(String(toolReply?.content ?? "")).toContain('"ok":false');
+    expect(result.narration).toBe("There is no such treasure here, only damp stone.");
+    scanForLeaks(fake.requests, state);
+  });
+
+  it("banter produces no tool call and no state change", async () => {
+    const { state, world } = freshGame();
+    const before = structuredClone(state);
+    const fake = new FakeClient([{ content: "The dark chuckles back at you." }]);
+    const result = await runTurn(
+      { state, world, history: [] },
+      "haha, this crypt stinks",
+      { client: fake, rng: seqRng([]) },
+    );
+    expect(result.toolLog).toHaveLength(0);
+    expect(state).toEqual(before);
+    expect(result.narration).toBe("The dark chuckles back at you.");
+    expect(fake.requests).toHaveLength(1);
+    scanForLeaks(fake.requests, state);
+  });
+});
+
+describe("GAME_MASTER_PROMPT playtest rules", () => {
+  it("locks the narration, cheat-rejection, banter and goal rules", () => {
+    expect(GAME_MASTER_PROMPT).toContain("pick_up for a claimed item");
+    expect(GAME_MASTER_PROMPT).toContain("banter");
+    expect(GAME_MASTER_PROMPT).toContain("Lost Relic");
+    expect(GAME_MASTER_PROMPT).toContain("2-4 sentences");
+    expect(GAME_MASTER_PROMPT).toContain("quirk");
+  });
+});
+
+describe("cli roll + reveal formatting", () => {
+  it("formats attack rolls as hit/miss with their target", () => {
+    expect(
+      formatRoll({ purpose: "player attack", sides: 20, value: 14, target: 10, success: true }),
+    ).toBe("🎲 Attack roll: 14 (needed 10+) → hit");
+    expect(
+      formatRoll({ purpose: "player attack", sides: 20, value: 3, target: 10, success: false }),
+    ).toBe("🎲 Attack roll: 3 (needed 10+) → miss");
+  });
+
+  it("formats enemy attack, sneak, grab, damage and trap rolls", () => {
+    expect(
+      formatRoll({ purpose: "enemy attack", sides: 20, value: 15, target: 12, success: true }),
+    ).toBe("🎲 Enemy attack: 15 (needed 12+) → it hits you");
+    expect(
+      formatRoll({ purpose: "enemy attack", sides: 20, value: 5, target: 12, success: false }),
+    ).toBe("🎲 Enemy attack: 5 (needed 12+) → it misses");
+    expect(formatRoll({ purpose: "sneak", sides: 20, value: 17, target: 13, success: true })).toBe(
+      "🎲 Sneak roll: 17 (needed 13+) → success",
+    );
+    expect(formatRoll({ purpose: "sneak", sides: 20, value: 3, target: 13, success: false })).toBe(
+      "🎲 Sneak roll: 3 (needed 13+) → fail",
+    );
+    expect(formatRoll({ purpose: "grab", sides: 20, value: 17, target: 6, success: true })).toBe(
+      "🎲 Grab roll: 17 (needed 6+) → success",
+    );
+    expect(formatRoll({ purpose: "player damage", sides: 4, value: 4, target: 0, success: true })).toBe(
+      "🎲 Damage: 4",
+    );
+    expect(formatRoll({ purpose: "trap", sides: 4, value: 3, target: 0, success: true })).toBe(
+      "🎲 Trap: 3 damage",
+    );
+  });
+
+  it("reveals room names and a readable trapped door", () => {
+    const { state, world } = freshGame();
+    state.secrets.relicRoomId = "ossuary";
+    state.secrets.trap = { roomId: "flooded_chapel", direction: "north" };
+    expect(formatRelicReveal(state, world)).toBe("The relic was in: Ossuary");
+    expect(formatTrapReveal(state, world)).toBe("Trapped door: Flooded Chapel, north");
   });
 });
 

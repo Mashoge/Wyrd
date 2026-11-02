@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import * as readline from "node:readline";
+import type { DiceRoll, GameState, World } from "../game/types.js";
 import { startGame } from "../game/state.js";
 import { newSalt, verify } from "../game/secrets.js";
 import { sunkenCrypt } from "../game/worlds/sunkenCrypt.js";
@@ -49,6 +50,45 @@ function formatToolCall(name: string, args: Record<string, unknown>): string {
   }
 }
 
+export function formatRoll(roll: DiceRoll): string {
+  switch (roll.purpose) {
+    case "player attack": {
+      return `🎲 Attack roll: ${roll.value} (needed ${roll.target}+) → ${roll.success ? "hit" : "miss"}`;
+    }
+    case "enemy attack": {
+      return `🎲 Enemy attack: ${roll.value} (needed ${roll.target}+) → ${roll.success ? "it hits you" : "it misses"}`;
+    }
+    case "sneak": {
+      return `🎲 Sneak roll: ${roll.value} (needed ${roll.target}+) → ${roll.success ? "success" : "fail"}`;
+    }
+    case "grab": {
+      return `🎲 Grab roll: ${roll.value} (needed ${roll.target}+) → ${roll.success ? "success" : "fail"}`;
+    }
+    case "player damage": {
+      return `🎲 Damage: ${roll.value}`;
+    }
+    case "trap": {
+      return `🎲 Trap: ${roll.value} damage`;
+    }
+    default: {
+      if (roll.target > 0) {
+        return `🎲 ${roll.purpose}: ${roll.value} (needed ${roll.target}+) → ${roll.success ? "success" : "fail"}`;
+      }
+      return `🎲 ${roll.purpose}: ${roll.value}`;
+    }
+  }
+}
+
+export function formatRelicReveal(state: GameState, world: World): string {
+  const name = world.rooms[state.secrets.relicRoomId]?.name ?? state.secrets.relicRoomId;
+  return `The relic was in: ${name}`;
+}
+
+export function formatTrapReveal(state: GameState, world: World): string {
+  const name = world.rooms[state.secrets.trap.roomId]?.name ?? state.secrets.trap.roomId;
+  return `Trapped door: ${name}, ${state.secrets.trap.direction}`;
+}
+
 function printTurn(result: TurnResult): void {
   console.log(result.narration);
   for (const entry of result.toolLog) {
@@ -60,7 +100,7 @@ function printTurn(result: TurnResult): void {
       console.log(`  ✗ ${call}: ${reason}`);
     }
     for (const roll of entry.result.rolls) {
-      console.log(`    🎲 ${roll.purpose}: ${roll.value} (d${roll.sides})`);
+      console.log(`    ${formatRoll(roll)}`);
     }
   }
   const player = result.view.player;
@@ -106,10 +146,8 @@ async function main(): Promise<void> {
       } else {
         console.log("You lost. The crypt keeps you.");
       }
-      console.log(`Relic room: ${state.secrets.relicRoomId}`);
-      console.log(
-        `Trapped door: ${state.secrets.trap.roomId} ${state.secrets.trap.direction}`,
-      );
+      console.log(formatRelicReveal(state, sunkenCrypt));
+      console.log(formatTrapReveal(state, sunkenCrypt));
       console.log(`Salt: ${state.salt}`);
       if (verify(state.secrets, state.salt, state.commitment)) {
         console.log("Verify: ✓ the secrets match the sealed fingerprint");
@@ -156,4 +194,6 @@ async function main(): Promise<void> {
   }
 }
 
-void main();
+if (process.env["VITEST"] !== "true") {
+  void main();
+}

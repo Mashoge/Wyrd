@@ -249,11 +249,12 @@ describe("pickUp", () => {
   it("picks up the item when the grab roll beats alertness", () => {
     const world = makeWorld();
     const state = makeState(world);
-    // grab d20=17 beats alertness 5.
+    // grab d20=17 beats alertness 5 (target 6).
     const result = pickUp(state, world, "torch", seqRng([0.84]));
     expect(result.ok).toBe(true);
     expect(result.rolls).toHaveLength(1);
     expect(result.rolls[0]).toMatchObject({ purpose: "grab", sides: 20, value: 17 });
+    expect(result.rolls[0]).toMatchObject({ target: 6, success: true });
     expect(state.inventory).toEqual(["torch"]);
     expect(state.rooms["entrance"]!.items).toEqual(["key"]);
     expect(state.hp).toBe(10);
@@ -263,10 +264,12 @@ describe("pickUp", () => {
   it("keeps the item but ends the turn when the grab fails", () => {
     const world = makeWorld();
     const state = makeState(world);
-    // grab d20=3 fails vs alertness 5; enemy d20=5 misses.
+    // grab d20=3 fails vs alertness 5 (target 6); enemy d20=5 misses (target 12).
     const result = pickUp(state, world, "torch", seqRng([0.1, 0.2]));
     expect(result.ok).toBe(true);
     expect(result.rolls.map((r) => r.purpose)).toEqual(["grab", "enemy attack"]);
+    expect(result.rolls[0]).toMatchObject({ target: 6, success: false });
+    expect(result.rolls[1]).toMatchObject({ target: 12, success: false });
     expect(state.inventory).toEqual([]);
     expect(state.rooms["entrance"]!.items).toEqual(["torch", "key"]);
     expect(result.events[0]).toBe("The Goblin noticed you!");
@@ -276,9 +279,10 @@ describe("pickUp", () => {
   it("takes counterattack damage when the grab fails and the enemy hits", () => {
     const world = makeWorld();
     const state = makeState(world);
-    // grab d20=3 fails vs alertness 5; enemy d20=15 hits for 2.
+    // grab d20=3 fails vs alertness 5 (target 6); enemy d20=15 hits (target 12) for 2.
     const result = pickUp(state, world, "torch", seqRng([0.1, 0.7]));
     expect(result.ok).toBe(true);
+    expect(result.rolls[1]).toMatchObject({ target: 12, success: true });
     expect(state.hp).toBe(8);
     expect(state.inventory).toEqual([]);
     expect(state.turn).toBe(1);
@@ -385,7 +389,7 @@ describe("attack", () => {
   it("hits, damages, and provokes a missed counterattack", () => {
     const world = makeWorld();
     const state = makeState(world);
-    // d20=17 hit, d4=2 -> 3 damage, enemy d20=5 miss.
+    // d20=17 hit (target 10), d4=2 -> 3 damage, enemy d20=5 miss (target 12).
     const result = attack(state, world, "goblin", seqRng([0.84, 0.3, 0.2]));
     expect(result.ok).toBe(true);
     expect(result.rolls.map((r) => r.purpose)).toEqual([
@@ -394,7 +398,10 @@ describe("attack", () => {
       "enemy attack",
     ]);
     expect(result.rolls[0]).toMatchObject({ sides: 20, value: 17 });
+    expect(result.rolls[0]).toMatchObject({ target: 10, success: true });
     expect(result.rolls[1]).toMatchObject({ sides: 4, value: 2 });
+    expect(result.rolls[1]).toMatchObject({ target: 0, success: true });
+    expect(result.rolls[2]).toMatchObject({ target: 12, success: false });
     expect(state.enemies["goblin"]!.hp).toBe(2);
     expect(state.enemies["goblin"]!.defeated).toBe(false);
     expect(state.hp).toBe(10);
@@ -405,10 +412,12 @@ describe("attack", () => {
     const world = makeWorld();
     const state = makeState(world);
     state.hp = 1;
-    // player d20=3 miss, enemy d20=15 hit for 2 -> clamped to 0.
+    // player d20=3 miss (target 10), enemy d20=15 hit (target 12) for 2 -> clamped to 0.
     const result = attack(state, world, "goblin", seqRng([0.1, 0.7]));
     expect(result.ok).toBe(true);
     expect(result.rolls).toHaveLength(2);
+    expect(result.rolls[0]).toMatchObject({ purpose: "player attack", target: 10, success: false });
+    expect(result.rolls[1]).toMatchObject({ purpose: "enemy attack", target: 12, success: true });
     expect(state.hp).toBe(0);
     expect(state.status).toBe("lost");
     expect(result.events).toContain("You died.");
@@ -418,14 +427,43 @@ describe("attack", () => {
     const world = makeWorld();
     const state = makeState(world);
     state.enemies["goblin"]!.hp = 2;
-    // d20=20 hit, d4=3 -> 4 damage kills.
+    // d20=20 hit (target 10), d4=3 -> 4 damage kills.
     const result = attack(state, world, "goblin", seqRng([0.95, 0.6]));
     expect(result.ok).toBe(true);
     expect(result.rolls).toHaveLength(2);
+    expect(result.rolls[0]).toMatchObject({ target: 10, success: true });
+    expect(result.rolls[1]).toMatchObject({ target: 0, success: true });
     expect(state.enemies["goblin"]!.defeated).toBe(true);
     expect(state.rooms["entrance"]!.items).toContain("coin");
     expect(state.hp).toBe(10);
     expect(result.events).toContain("You defeated the Goblin.");
+    expect(result.events).toContain("The Goblin dropped Gold Coin.");
+    expect(result.events.indexOf("The Goblin dropped Gold Coin.")).toBeGreaterThan(
+      result.events.indexOf("You defeated the Goblin."),
+    );
+  });
+
+  it("emits one drop event per loot item, none when there is no loot", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.enemies["goblin"]!.hp = 2;
+    state.enemies["goblin"]!.loot = ["coin", "torch"];
+    const result = attack(state, world, "goblin", seqRng([0.95, 0.6]));
+    expect(result.ok).toBe(true);
+    expect(result.events).toContain("The Goblin dropped Gold Coin.");
+    expect(result.events).toContain("The Goblin dropped Torch.");
+    expect(state.rooms["entrance"]!.items).toEqual(
+      expect.arrayContaining(["coin", "torch"]),
+    );
+
+    const bare = makeWorld();
+    bare.enemies["goblin"]!.loot = [];
+    bare.enemies["goblin"]!.hp = 2;
+    const bareState = makeState(bare);
+    const bareResult = attack(bareState, bare, "goblin", seqRng([0.95, 0.6]));
+    expect(bareResult.ok).toBe(true);
+    expect(bareResult.events).toContain("You defeated the Goblin.");
+    expect(bareResult.events.filter((e) => e.includes("dropped"))).toEqual([]);
   });
 
   it("rejects an enemy that is not in the room", () => {
@@ -454,11 +492,12 @@ describe("sneak", () => {
   it("succeeds on 13+ and sets the sneaked flag", () => {
     const world = makeWorld();
     const state = makeState(world);
-    // d20=17 success, no counterattack roll needed.
+    // d20=17 success (target 13), no counterattack roll needed.
     const result = sneak(state, world, "goblin", seqRng([0.84]));
     expect(result.ok).toBe(true);
     expect(result.rolls).toHaveLength(1);
     expect(result.rolls[0]).toMatchObject({ purpose: "sneak", sides: 20, value: 17 });
+    expect(result.rolls[0]).toMatchObject({ target: 13, success: true });
     expect(state.flags["sneaked:entrance"]).toBe(true);
     expect(state.hp).toBe(10);
     expect(state.turn).toBe(1);
@@ -468,10 +507,12 @@ describe("sneak", () => {
   it("fails and provokes a counterattack hit", () => {
     const world = makeWorld();
     const state = makeState(world);
-    // sneak d20=3 fail, enemy d20=15 hit for 2.
+    // sneak d20=3 fail (target 13), enemy d20=15 hit (target 12) for 2.
     const result = sneak(state, world, "goblin", seqRng([0.1, 0.7]));
     expect(result.ok).toBe(true);
     expect(result.rolls.map((r) => r.purpose)).toEqual(["sneak", "enemy attack"]);
+    expect(result.rolls[0]).toMatchObject({ target: 13, success: false });
+    expect(result.rolls[1]).toMatchObject({ target: 12, success: true });
     expect(state.flags["sneaked:entrance"]).toBeUndefined();
     expect(state.hp).toBe(8);
     expect(state.turn).toBe(1);
@@ -598,7 +639,7 @@ describe("trap", () => {
     // d4: 1 + floor(0.5 * 4) = 3.
     const result = move(state, world, "north", seqRng([0.5]));
     expect(result.ok).toBe(true);
-    expect(result.rolls).toEqual([{ purpose: "trap", sides: 4, value: 3 }]);
+    expect(result.rolls).toEqual([{ purpose: "trap", sides: 4, value: 3, target: 0, success: true }]);
     expect(state.hp).toBe(7);
     expect(state.flags["trap_sprung"]).toBe(true);
     expect(result.events).toContain("A trap springs! You take 3 damage.");
@@ -639,7 +680,7 @@ describe("trap", () => {
     const world = makeWorld();
     const state = makeTrapState(world);
     const result = move(state, world, " North ", seqRng([0.0]));
-    expect(result.rolls).toEqual([{ purpose: "trap", sides: 4, value: 1 }]);
+    expect(result.rolls).toEqual([{ purpose: "trap", sides: 4, value: 1, target: 0, success: true }]);
     expect(state.hp).toBe(9);
     expect(result.events).toContain("A trap springs! You take 1 damage.");
   });

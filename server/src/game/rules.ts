@@ -48,7 +48,7 @@ function enemyCounterattack(
   rolls: ToolResult["rolls"],
   events: string[],
 ): void {
-  const attackRoll = rollDie(20, rng, "enemy attack");
+  const attackRoll = rollDie(20, rng, "enemy attack", 12);
   rolls.push(attackRoll);
   if (attackRoll.value >= 12) {
     state.hp = Math.max(0, state.hp - enemy.attack);
@@ -104,7 +104,7 @@ export function move(
     originId === state.secrets.trap.roomId &&
     direction === normalizeDirection(state.secrets.trap.direction)
   ) {
-    const trapRoll = rollDie(4, rng, "trap");
+    const trapRoll = rollDie(4, rng, "trap", 0);
     rolls.push(trapRoll);
     state.hp = Math.max(0, state.hp - trapRoll.value);
     state.flags["trap_sprung"] = true;
@@ -134,7 +134,7 @@ export function pickUp(state: GameState, world: World, itemId: string, rng: Rng)
     return reject("pickUp", `The ${watcher.name} is watching you.`);
   }
   if (watched && watcher.alertness > 0) {
-    const grabRoll = rollDie(20, rng, "grab");
+    const grabRoll = rollDie(20, rng, "grab", watcher.alertness + 1);
     if (grabRoll.value > watcher.alertness) {
       room.items.splice(index, 1);
       state.inventory.push(itemId);
@@ -210,20 +210,21 @@ export function attack(
   }
   const rolls: ToolResult["rolls"] = [];
   const events: string[] = [];
-  const attackRoll = rollDie(20, rng, "player attack");
+  const attackRoll = rollDie(20, rng, "player attack", 10);
   rolls.push(attackRoll);
   if (attackRoll.value >= 10) {
-    const damageRoll = rollDie(4, rng, "player damage");
+    const damageRoll = rollDie(4, rng, "player damage", 0);
     rolls.push(damageRoll);
     const damage = damageRoll.value + 1;
     enemy.hp -= damage;
     events.push(`You hit the ${enemy.name} for ${damage} damage.`);
     if (enemy.hp <= 0) {
       enemy.defeated = true;
+      events.push(`You defeated the ${enemy.name}.`);
       for (const lootId of enemy.loot) {
         room.items.push(lootId);
+        events.push(`The ${enemy.name} dropped ${itemName(world, lootId)}.`);
       }
-      events.push(`You defeated the ${enemy.name}.`);
     }
   } else {
     events.push(`You missed the ${enemy.name}.`);
@@ -254,7 +255,7 @@ export function sneak(
   }
   const rolls: ToolResult["rolls"] = [];
   const events: string[] = [];
-  const sneakRoll = rollDie(20, rng, "sneak");
+  const sneakRoll = rollDie(20, rng, "sneak", 13);
   rolls.push(sneakRoll);
   if (sneakRoll.value >= 13) {
     state.flags[`sneaked:${room.id}`] = true;
