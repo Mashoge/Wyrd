@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+:root {
+  --wyrd-base: #120e17;
+  --wyrd-panel: #1a1421;
+  --wyrd-raised: #2a2133;
+  --wyrd-text: #f4eff6;
+  --wyrd-muted: #b9aec0;
+  --wyrd-accent: #b44dff;
+  --wyrd-accent-tint-bg: #3a2848;
+  --wyrd-accent-tint-text: #e8ccff;
+  --wyrd-danger: #ff6b5b;
+  --wyrd-verified: #4de8b5;
+  --wyrd-line: #5a4a68;
+  --wyrd-deep: #0c0910;
+  --wyrd-ease: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--wyrd-base);
+  color: var(--wyrd-text);
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.font-title {
+  font-family: "Cinzel", Georgia, serif;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.font-story {
+  font-family: "Literata", Georgia, serif;
+}
+
+.font-rune {
+  font-family: "Noto Sans Runic", serif;
+}
+
+.panel-cut {
+  clip-path: polygon(0 0, 100% 0, 100% 88%, 95% 100%, 0 100%);
+}
+
+.slant {
+  clip-path: polygon(6% 0, 100% 0, 94% 100%, 0 100%);
+}
+
+.stamp {
+  font-family: "Cinzel", Georgia, serif;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.wyrd-btn {
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  border: 0;
+  cursor: pointer;
+  padding: 12px 24px;
+  min-height: 44px;
+  clip-path: polygon(6% 0, 100% 0, 94% 100%, 0 100%);
+  transition: transform 180ms var(--wyrd-ease), background 180ms ease;
+}
+
+.wyrd-btn:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.wyrd-btn:focus-visible,
+.wyrd-input:focus-visible,
+.wyrd-chip:focus-visible {
+  outline: 2px solid var(--wyrd-accent);
+  outline-offset: 2px;
+}
+
+.wyrd-input {
+  background: var(--wyrd-deep);
+  border: 0;
+  border-bottom: 2px solid var(--wyrd-accent);
+  color: var(--wyrd-text);
+  font-family: "Literata", Georgia, serif;
+  font-size: 19px;
+  padding: 0 16px;
+  min-height: 50px;
+  outline: none;
+}
+
+.wyrd-input::placeholder {
+  color: var(--wyrd-muted);
+  opacity: 0.7;
+}
+
+.wyrd-chip {
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  border: 0;
+  cursor: pointer;
+  padding: 12px 22px;
+  min-height: 44px;
+  clip-path: polygon(6% 0, 100% 0, 94% 100%, 0 100%);
+  transition: transform 180ms var(--wyrd-ease), background 180ms ease;
+}
+
+.wyrd-chip:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.dropcap::first-letter {
+  font-family: "Cinzel", Georgia, serif;
+  font-weight: 800;
+  float: left;
+  font-size: 54px;
+  line-height: 0.9;
+  padding: 4px 10px 0 0;
+  color: var(--wyrd-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

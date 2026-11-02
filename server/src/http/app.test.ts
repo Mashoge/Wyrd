@@ -121,6 +121,33 @@ describe("health + game lifecycle", () => {
     expect(resumed.body.commitment).toBe(created.body.commitment);
     deps.store.stop();
   });
+
+  it("every game response includes 2-4 valid suggestions and no leaks", async () => {
+    const client = new FakeClient();
+    client.script = [{ content: "Opening." }, { content: "You wait." }];
+    const deps = makeDeps(client, { ms: 0 });
+    const app = createApp(deps);
+    const created = await request(app).post("/api/games");
+    expect(created.status).toBe(201);
+    for (const label of ["created", "turn", "resumed"] as const) {
+      const body =
+        label === "created"
+          ? created.body
+          : label === "turn"
+            ? (await request(app).post(`/api/games/${created.body.gameId as string}/turn`).send({ text: "wait" })).body
+            : (await request(app).get(`/api/games/${created.body.gameId as string}`)).body;
+      expect(Array.isArray(body.suggestions)).toBe(true);
+      const suggestions = body.suggestions as unknown[];
+      expect(suggestions.length).toBeGreaterThanOrEqual(2);
+      expect(suggestions.length).toBeLessThanOrEqual(4);
+      for (const s of suggestions) {
+        expect(typeof s).toBe("string");
+      }
+      const blob = JSON.stringify(body);
+      expect(blob).not.toContain("lost_relic");
+    }
+    deps.store.stop();
+  });
 });
 
 describe("errors", () => {

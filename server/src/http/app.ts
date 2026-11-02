@@ -2,6 +2,7 @@ import cors from "cors";
 import express, { type Express, type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
 import { runTurn, type TurnClient } from "../ai/loop.js";
+import { suggestActions } from "../ai/suggest.js";
 import { executeTool } from "../ai/tools.js";
 import { playerView, type PlayerView } from "../ai/view.js";
 import { nearMissMessage } from "../game/distance.js";
@@ -125,6 +126,7 @@ export function createApp(deps: AppDeps): Express {
         toolLog: result.toolLog,
         view: result.view,
         status: result.status,
+        suggestions: suggestActions(result.view, sunkenCrypt),
       });
     } catch {
       const look = executeTool(state, sunkenCrypt, "look", "{}", rng);
@@ -143,6 +145,7 @@ export function createApp(deps: AppDeps): Express {
         toolLog: [],
         view,
         status,
+        suggestions: suggestActions(view, sunkenCrypt),
       });
     } finally {
       entry.busy = false;
@@ -189,6 +192,7 @@ export function createApp(deps: AppDeps): Express {
         toolLog: result.toolLog,
         view: result.view,
         status: result.status,
+        suggestions: suggestActions(result.view, entry.session.world),
       });
     } catch {
       sendErr(res, 502, "The game master is unavailable, try again.");
@@ -206,11 +210,13 @@ export function createApp(deps: AppDeps): Express {
     }
     deps.store.touch(gameId);
     const { state, world } = entry.session;
+    const resumeView = playerView(state, world);
     res.json({
       gameId,
       commitment: state.commitment,
-      view: playerView(state, world),
+      view: resumeView,
       status: state.status,
+      suggestions: suggestActions(resumeView, world),
     });
   });
 
