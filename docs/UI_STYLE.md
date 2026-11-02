@@ -39,7 +39,7 @@ Living document: we refine it as we build. Concept mockups: V3 "Kinetic fate" on
 | Use | Font (Google Fonts) |
 |---|---|
 | Titles, names, stamps, big numbers | **Cinzel** 600/800, uppercase, letter-spaced |
-| Story narration, player lines | **EB Garamond** (player lines in italic, prefixed with "— ") |
+| Story narration, player lines | **Literata** (a serif built for on-screen reading; player lines in italic, prefixed with "— ") |
 | UI labels, stats, buttons, numbers in sentences | **Inter** 400/500/600 |
 | Runes (decoration only) | **Noto Sans Runic** |
 | Code view (Inspector only) | System monospace |
@@ -95,3 +95,4 @@ Inspired by the principles of these games' interfaces, not their assets:
 Design principle from the research: "Asymmetry with restraint" — angled, energetic shapes, strict colors, readable text.
 
 Concept history: V1 "Kinetic modern" (cohesive but off-theme), V2 "Kinetic ancient" (on-theme but rough edges broke cohesion), V3 "Kinetic fate" (chosen).
+Reference mockups (static, visual target only): docs/mockups/game-screen.html and docs/mockups/key-moments.html
