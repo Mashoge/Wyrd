@@ -41,6 +41,10 @@ function formatToolCall(name: string, args: Record<string, unknown>): string {
     case "look": {
       return "look()";
     }
+    case "examine": {
+      const itemId = stringArg(args, "item_id");
+      return itemId === null ? "examine()" : `examine(${itemId})`;
+    }
     default: {
       const entries = Object.entries(args)
         .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
@@ -65,7 +69,10 @@ export function formatRoll(roll: DiceRoll): string {
       return `🎲 Grab roll: ${roll.value} (needed ${roll.target}+) → ${roll.success ? "success" : "fail"}`;
     }
     case "player damage": {
-      return `🎲 Damage: ${roll.value}`;
+      if (roll.bonus === 0) {
+        return `🎲 Damage: ${roll.value}`;
+      }
+      return `🎲 Damage: ${roll.value} + ${roll.bonus} = ${roll.value + roll.bonus}`;
     }
     case "trap": {
       return `🎲 Trap: ${roll.value} damage`;

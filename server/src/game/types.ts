@@ -1,7 +1,13 @@
+export type ItemKind = "key" | "weapon" | "consumable" | "treasure" | "misc";
+
 export interface Item {
   id: string;
   name: string;
   description: string;
+  kind: ItemKind;
+  attackBonus?: number;
+  damageBonus?: number;
+  heal?: number;
 }
 
 export interface Exit {
@@ -61,6 +67,7 @@ export interface GameState {
   inventory: string[];
   currentRoomId: string;
   lastRoomId: string | null;
+  visitedRoomIds: string[];
   rooms: Record<string, Room>;
   enemies: Record<string, Enemy>;
   flags: Record<string, boolean>;
@@ -83,6 +90,7 @@ export interface DiceRoll {
   value: number;
   target: number;
   success: boolean;
+  bonus: number;
 }
 
 export interface ToolResult {

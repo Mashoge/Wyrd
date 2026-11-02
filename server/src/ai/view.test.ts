@@ -89,6 +89,12 @@ describe("playerView leaks nothing", () => {
     expect(conditionFor(1, 12)).toBe("badly wounded");
   });
 
+  it("returns defeated when the enemy is defeated", () => {
+    expect(conditionFor(12, 12, true)).toBe("defeated");
+    expect(conditionFor(1, 12, true)).toBe("defeated");
+    expect(conditionFor(12, 12, false)).toBe("unhurt");
+  });
+
   it("reflects wounded enemies through the view", () => {
     const state = freshGame();
     state.currentRoomId = "gate_hall";
@@ -99,6 +105,38 @@ describe("playerView leaks nothing", () => {
     state.enemies["bone_troll"]!.defeated = true;
     const view = playerView(state, sunkenCrypt);
     expect(view.enemy?.defeated).toBe(true);
+    expect(view.enemy?.condition).toBe("defeated");
+  });
+
+  it("shows leadsTo only for visited destinations and never leaks unvisited names", () => {
+    const state = freshGame();
+    // Start: entrance visited, hall not. Entrance north exit has no leadsTo.
+    let view = playerView(state, sunkenCrypt);
+    expect(view.exits).toHaveLength(1);
+    expect(view.exits[0]).toEqual({ direction: "north", locked: false });
+    expect(JSON.stringify(view)).not.toContain("Echoing Hall");
+    // After visiting hall, entrance north exit names it.
+    state.visitedRoomIds.push("hall");
+    view = playerView(state, sunkenCrypt);
+    expect(view.exits[0]).toEqual({ direction: "north", locked: false, leadsTo: "Echoing Hall" });
+    // Hall leads back to visited entrance, but not to unvisited rooms.
+    state.currentRoomId = "hall";
+    view = playerView(state, sunkenCrypt);
+    const byDirection = new Map(view.exits.map((e) => [e.direction, e]));
+    expect(byDirection.get("south")).toEqual({
+      direction: "south",
+      locked: false,
+      leadsTo: "Crypt Entrance",
+    });
+    expect(byDirection.get("north")?.leadsTo).toBeUndefined();
+    expect(byDirection.get("east")?.leadsTo).toBeUndefined();
+    expect(byDirection.get("west")?.leadsTo).toBeUndefined();
+    const json = JSON.stringify(view);
+    for (const room of Object.values(sunkenCrypt.rooms)) {
+      if (!state.visitedRoomIds.includes(room.id)) {
+        expect(json).not.toContain(room.name);
+      }
+    }
   });
 });
 

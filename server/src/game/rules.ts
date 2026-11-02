@@ -1,5 +1,5 @@
 import { rollDie } from "./dice.js";
-import type { Enemy, GameState, Rng, ToolResult, World } from "./types.js";
+import type { Enemy, GameState, Item, Rng, ToolResult, World } from "./types.js";
 
 function gameOverResult(action: string): ToolResult {
   return { ok: false, action, reason: "The game is over.", rolls: [], events: [] };
@@ -11,6 +11,44 @@ function reject(action: string, reason: string): ToolResult {
 
 function itemName(world: World, itemId: string): string {
   return world.items[itemId]?.name ?? itemId;
+}
+
+function bestWeapon(world: World, state: GameState): Item | undefined {
+  let best: Item | undefined = undefined;
+  let bestScore = -1;
+  for (const itemId of state.inventory) {
+    const item = world.items[itemId];
+    if (item === undefined || item.kind !== "weapon") continue;
+    const score = (item.attackBonus ?? 0) + (item.damageBonus ?? 0);
+    if (score > bestScore) {
+      bestScore = score;
+      best = item;
+    }
+  }
+  return best;
+}
+
+export function examine(state: GameState, world: World, itemId: string): ToolResult {
+  const room = state.rooms[state.currentRoomId];
+  const inRoom = room !== undefined && room.items.includes(itemId);
+  const inInventory = state.inventory.includes(itemId);
+  if (!inRoom && !inInventory) {
+    return reject("examine", `You don't see any ${itemId} here.`);
+  }
+  const item = world.items[itemId];
+  if (item === undefined) {
+    return reject("examine", `You don't see any ${itemId} here.`);
+  }
+  let detail = `${item.name}: ${item.description}`;
+  if (item.kind === "weapon") {
+    const parts: string[] = [];
+    if (item.attackBonus !== undefined) parts.push(`+${item.attackBonus} attack`);
+    if (item.damageBonus !== undefined) parts.push(`+${item.damageBonus} damage`);
+    if (parts.length > 0) detail += ` (${parts.join(", ")})`;
+  } else if (item.kind === "consumable" && item.heal !== undefined) {
+    detail += ` (restores ${item.heal} HP)`;
+  }
+  return { ok: true, action: "examine", rolls: [], events: [detail] };
 }
 
 function normalizeDirection(direction: string): string {
@@ -93,6 +131,9 @@ export function move(
   }
   state.lastRoomId = state.currentRoomId;
   state.currentRoomId = exit.to;
+  if (!state.visitedRoomIds.includes(exit.to)) {
+    state.visitedRoomIds.push(exit.to);
+  }
   const destName = state.rooms[exit.to]?.name ?? exit.to;
   const rolls: ToolResult["rolls"] = [];
   const events = [`You moved ${direction} to the ${destName}.`];
@@ -159,13 +200,35 @@ export function useItem(
   state: GameState,
   world: World,
   itemId: string,
-  rawDirection: string,
+  rawDirection?: string | null,
 ): ToolResult {
   if (state.status !== "playing") {
     return gameOverResult("useItem");
   }
-  if (!state.inventory.includes(itemId)) {
+  const item = world.items[itemId];
+  if (item === undefined || !state.inventory.includes(itemId)) {
     return reject("useItem", `You do not have the ${itemName(world, itemId)}.`);
+  }
+  if (item.kind === "consumable") {
+    const heal = item.heal ?? 0;
+    if (state.hp >= state.maxHp) {
+      return reject("useItem", "You are already at full health.");
+    }
+    const recovered = Math.min(heal, state.maxHp - state.hp);
+    state.hp += recovered;
+    state.inventory = state.inventory.filter((id) => id !== itemId);
+    const events = [`You drink the ${item.name} and recover ${recovered} HP.`];
+    events.push(...endTurn(state, world));
+    return { ok: true, action: "useItem", rolls: [], events };
+  }
+  if (item.kind === "weapon") {
+    return reject("useItem", `The ${item.name} is used automatically when you attack.`);
+  }
+  if (item.kind === "treasure" || item.kind === "misc") {
+    return reject("useItem", `Nothing happens when you use the ${item.name}.`);
+  }
+  if (rawDirection === undefined || rawDirection === null) {
+    return reject("useItem", `Use the ${item.name} on which door? Say a direction.`);
   }
   const room = state.rooms[state.currentRoomId];
   if (room === undefined) {
@@ -210,12 +273,22 @@ export function attack(
   }
   const rolls: ToolResult["rolls"] = [];
   const events: string[] = [];
-  const attackRoll = rollDie(20, rng, "player attack", 10);
+  const weapon = bestWeapon(world, state);
+  const attackBonus = weapon?.attackBonus ?? 0;
+  const damageBonus = weapon?.damageBonus ?? 0;
+  const hitTarget = 10 - attackBonus;
+  if (weapon !== undefined) {
+    events.push(`You strike with the ${weapon.name}.`);
+  } else {
+    events.push("You fight bare-handed.");
+  }
+  const attackRoll = rollDie(20, rng, "player attack", hitTarget);
   rolls.push(attackRoll);
-  if (attackRoll.value >= 10) {
-    const damageRoll = rollDie(4, rng, "player damage", 0);
+  if (attackRoll.value >= hitTarget) {
+    const bonus = 1 + damageBonus;
+    const damageRoll = rollDie(4, rng, "player damage", 0, bonus);
     rolls.push(damageRoll);
-    const damage = damageRoll.value + 1;
+    const damage = damageRoll.value + bonus;
     enemy.hp -= damage;
     events.push(`You hit the ${enemy.name} for ${damage} damage.`);
     if (enemy.hp <= 0) {

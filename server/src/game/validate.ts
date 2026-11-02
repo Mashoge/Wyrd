@@ -87,6 +87,32 @@ export function validateWorld(world: World): string[] {
     if (item.id !== key) {
       errors.push(`Item key "${key}" does not match its id "${item.id}".`);
     }
+    const validKinds = ["key", "weapon", "consumable", "treasure", "misc"];
+    if (!validKinds.includes(item.kind)) {
+      errors.push(`Item "${key}" has invalid kind "${item.kind}".`);
+      continue;
+    }
+    for (const [field, value] of [
+      ["attackBonus", item.attackBonus],
+      ["damageBonus", item.damageBonus],
+      ["heal", item.heal],
+    ] as const) {
+      if (value !== undefined && (!Number.isInteger(value) || value < 0)) {
+        errors.push(`Item "${key}" has invalid ${field} ${value}: must be a non-negative integer.`);
+      }
+    }
+    if (item.kind === "weapon") {
+      const attackBonus = item.attackBonus ?? 0;
+      const damageBonus = item.damageBonus ?? 0;
+      if (attackBonus <= 0 && damageBonus <= 0) {
+        errors.push(`Weapon "${key}" must have an attackBonus or damageBonus.`);
+      }
+    }
+    if (item.kind === "consumable") {
+      if (item.heal === undefined || !Number.isInteger(item.heal) || item.heal <= 0) {
+        errors.push(`Consumable "${key}" must have heal > 0.`);
+      }
+    }
   }
   for (const [key, enemy] of Object.entries(world.enemies)) {
     if (enemy.id !== key) {
@@ -128,6 +154,14 @@ export function validateWorld(world: World): string[] {
         errors.push(
           `Room "${roomKey}" exit "${exit.direction}" has unknown keyItemId "${exit.keyItemId}".`,
         );
+      }
+      if (exit.keyItemId !== undefined && world.items[exit.keyItemId] !== undefined) {
+        const keyItem = world.items[exit.keyItemId];
+        if (keyItem !== undefined && keyItem.kind !== "key") {
+          errors.push(
+            `Room "${roomKey}" exit "${exit.direction}" keyItemId "${exit.keyItemId}" is not a key (kind "${keyItem.kind}").`,
+          );
+        }
       }
       if (exit.locked === true && exit.keyItemId === undefined) {
         errors.push(

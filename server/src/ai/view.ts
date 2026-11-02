@@ -1,10 +1,11 @@
 import type { GameState, GameStatus, World } from "../game/types.js";
 
-export type ConditionLabel = "unhurt" | "wounded" | "badly wounded";
+export type ConditionLabel = "unhurt" | "wounded" | "badly wounded" | "defeated";
 
 export interface PlayerViewExit {
   direction: string;
   locked: boolean;
+  leadsTo?: string;
 }
 
 export interface PlayerViewItem {
@@ -43,7 +44,10 @@ export interface PlayerView {
   player: PlayerViewPlayer;
 }
 
-export function conditionFor(hp: number, maxHp: number): ConditionLabel {
+export function conditionFor(hp: number, maxHp: number, defeated = false): ConditionLabel {
+  if (defeated) {
+    return "defeated";
+  }
   if (hp >= maxHp) {
     return "unhurt";
   }
@@ -67,10 +71,13 @@ export function playerView(state: GameState, world: World): PlayerView {
     throw new Error(`Current room "${state.currentRoomId}" does not exist.`);
   }
 
-  const exits: PlayerViewExit[] = room.exits.map((e) => ({
-    direction: e.direction,
-    locked: e.locked === true,
-  }));
+  const exits: PlayerViewExit[] = room.exits.map((e) => {
+    const dest = state.rooms[e.to];
+    if (dest !== undefined && state.visitedRoomIds.includes(e.to)) {
+      return { direction: e.direction, locked: e.locked === true, leadsTo: dest.name };
+    }
+    return { direction: e.direction, locked: e.locked === true };
+  });
 
   const items: PlayerViewItem[] = room.items.map((id) => itemView(world, id));
 
@@ -84,7 +91,7 @@ export function playerView(state: GameState, world: World): PlayerView {
         name: foe.name,
         quirk: foe.quirk,
         defeated: foe.defeated,
-        condition: conditionFor(foe.hp, maxHp),
+        condition: conditionFor(foe.hp, maxHp, foe.defeated),
       };
     }
   }

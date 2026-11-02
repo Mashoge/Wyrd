@@ -1,5 +1,5 @@
 import type { GameState, Rng, ToolResult, World } from "../game/types.js";
-import { attack, move, pickUp, sneak, useItem } from "../game/rules.js";
+import { attack, examine, move, pickUp, sneak, useItem } from "../game/rules.js";
 import { playerView } from "./view.js";
 
 export interface ToolFunctionParameter {
@@ -52,12 +52,12 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   ),
   def(
     "use_item",
-    "Use an inventory item on a locked exit in the current room. Fails without the item, without the exit, or with the wrong key.",
+    "Use an inventory item: drink a consumable to heal, or use a key on a locked exit in the current room.",
     {
       item_id: { type: "string", description: "ID of the inventory item to use." },
-      direction: { type: "string", description: "Direction of the locked exit." },
+      direction: { type: "string", description: "Direction of the locked exit (keys only)." },
     },
-    ["item_id", "direction"],
+    ["item_id"],
   ),
   def(
     "attack",
@@ -77,9 +77,15 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     {},
     [],
   ),
+  def(
+    "examine",
+    "Examine an item in the current room or your inventory. Returns its description. Never changes state or ends the turn.",
+    { item_id: { type: "string", description: "ID of the item to examine." } },
+    ["item_id"],
+  ),
 ];
 
-const KNOWN_TOOLS = new Set(["move", "pick_up", "use_item", "attack", "sneak", "look"]);
+const KNOWN_TOOLS = new Set(["move", "pick_up", "use_item", "attack", "sneak", "look", "examine"]);
 
 function invalidArgs(action: string, reason: string): ToolResult {
   return { ok: false, action, reason, rolls: [], events: [] };
@@ -158,10 +164,7 @@ export function executeTool(
         return invalidArgs(name, 'Invalid arguments: "item_id" must be a non-empty string.');
       }
       const direction = getStringArg(args, "direction");
-      if (direction === null) {
-        return invalidArgs(name, 'Invalid arguments: "direction" must be a non-empty string.');
-      }
-      return useItem(state, world, itemId, direction);
+      return useItem(state, world, itemId, direction ?? undefined);
     }
     case "attack": {
       const enemyId = getStringArg(args, "enemy_id");
@@ -179,6 +182,13 @@ export function executeTool(
     }
     case "look": {
       return { ok: true, action: "look", rolls: [], events: [describeLook(state, world)] };
+    }
+    case "examine": {
+      const itemId = getStringArg(args, "item_id");
+      if (itemId === null) {
+        return invalidArgs(name, 'Invalid arguments: "item_id" must be a non-empty string.');
+      }
+      return examine(state, world, itemId);
     }
     default: {
       return { ok: false, action: name, reason: `Unknown action ${name}.`, rolls: [], events: [] };

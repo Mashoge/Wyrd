@@ -70,7 +70,7 @@ function makeWorld(): World {
       },
     },
     items: {
-      relic: { id: "relic", name: "Relic", description: "The relic." },
+      relic: { id: "relic", name: "Relic", description: "The relic.", kind: "treasure" },
     },
     enemies: {},
   };

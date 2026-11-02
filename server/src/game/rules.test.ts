@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createGameState } from "./state.js";
-import { attack, endTurn, move, pickUp, sneak, useItem } from "./rules.js";
+import { attack, endTurn, examine, move, pickUp, sneak, useItem } from "./rules.js";
 import type { GameState, Rng, World } from "./types.js";
 
 function seqRng(values: number[]): Rng {
@@ -61,10 +61,33 @@ function makeWorld(): World {
       },
     },
     items: {
-      torch: { id: "torch", name: "Torch", description: "A flickering torch." },
-      key: { id: "key", name: "Iron Key", description: "An iron key." },
-      relic: { id: "relic", name: "Ancient Relic", description: "The relic." },
-      coin: { id: "coin", name: "Gold Coin", description: "A gold coin." },
+      torch: { id: "torch", name: "Torch", description: "A flickering torch.", kind: "misc" },
+      key: { id: "key", name: "Iron Key", description: "An iron key.", kind: "key" },
+      relic: { id: "relic", name: "Ancient Relic", description: "The relic.", kind: "treasure" },
+      coin: { id: "coin", name: "Gold Coin", description: "A gold coin.", kind: "misc" },
+      dagger: {
+        id: "dagger",
+        name: "Dagger",
+        description: "A sharp dagger.",
+        kind: "weapon",
+        attackBonus: 1,
+        damageBonus: 1,
+      },
+      club: {
+        id: "club",
+        name: "Club",
+        description: "A heavy club.",
+        kind: "weapon",
+        attackBonus: 0,
+        damageBonus: 1,
+      },
+      draught: {
+        id: "draught",
+        name: "Healing Draught",
+        description: "A healing vial.",
+        kind: "consumable",
+        heal: 4,
+      },
     },
     enemies: {
       goblin: {
@@ -112,6 +135,29 @@ describe("move", () => {
     expect(state.lastRoomId).toBe("entrance");
     expect(state.turn).toBe(1);
     expect(result.events[0]).toContain("Hallway");
+  });
+
+  it("tracks visited rooms: start included, move adds the new room, no duplicates", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    expect(state.visitedRoomIds).toEqual(["entrance"]);
+    state.enemies["goblin"]!.defeated = true;
+    move(state, world, "north", seqRng([]));
+    expect(state.visitedRoomIds).toEqual(["entrance", "hallway"]);
+    state.lastRoomId = null;
+    state.currentRoomId = "entrance";
+    move(state, world, "north", seqRng([]));
+    expect(state.visitedRoomIds).toEqual(["entrance", "hallway"]);
+  });
+
+  it("leaves visited rooms unchanged on a rejected move", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    const before = snapshot(state);
+    const result = move(state, world, "east", seqRng([]));
+    expect(result.ok).toBe(false);
+    expect(state.visitedRoomIds).toEqual(before.visitedRoomIds);
+    expect(state).toEqual(before);
   });
 
   it("rejects an unknown direction without changing state", () => {
@@ -370,9 +416,82 @@ describe("useItem", () => {
     const before = snapshot(state);
     const result = useItem(state, world, "torch", "east");
     expect(result.ok).toBe(false);
-    expect(result.reason).toContain("does not unlock");
+    expect(result.reason).toContain("Nothing happens");
     expect(state).toEqual(before);
     expect(state.turn).toBe(0);
+  });
+
+  it("rejects a key without a direction", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.inventory.push("key");
+    const before = snapshot(state);
+    const result = useItem(state, world, "key");
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("Use the Iron Key on which door? Say a direction.");
+    expect(state).toEqual(before);
+    expect(state.turn).toBe(0);
+  });
+
+  it("rejects using a weapon", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.inventory.push("dagger");
+    const before = snapshot(state);
+    const result = useItem(state, world, "dagger", "east");
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("The Dagger is used automatically when you attack.");
+    expect(state).toEqual(before);
+    expect(state.turn).toBe(0);
+  });
+
+  it("rejects using a treasure or misc item", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.inventory.push("coin");
+    expect(useItem(state, world, "coin").reason).toBe(
+      "Nothing happens when you use the Gold Coin.",
+    );
+    state.inventory.push("relic");
+    expect(useItem(state, world, "relic").reason).toBe(
+      "Nothing happens when you use the Ancient Relic.",
+    );
+    expect(state.turn).toBe(0);
+  });
+
+  it("heals with a consumable, capped at maxHp, and consumes it", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.hp = 8;
+    state.inventory.push("draught");
+    const result = useItem(state, world, "draught");
+    expect(result.ok).toBe(true);
+    expect(state.hp).toBe(10);
+    expect(state.inventory).not.toContain("draught");
+    expect(result.events).toContain("You drink the Healing Draught and recover 2 HP.");
+    expect(state.turn).toBe(1);
+  });
+
+  it("heals the full amount when hurt more", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.hp = 5;
+    state.inventory.push("draught");
+    const result = useItem(state, world, "draught");
+    expect(result.ok).toBe(true);
+    expect(state.hp).toBe(9);
+    expect(result.events).toContain("You drink the Healing Draught and recover 4 HP.");
+  });
+
+  it("rejects a consumable at full health", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.inventory.push("draught");
+    const before = snapshot(state);
+    const result = useItem(state, world, "draught");
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("You are already at full health.");
+    expect(state).toEqual(before);
   });
 
   it("normalizes direction case and whitespace", () => {
@@ -386,7 +505,7 @@ describe("useItem", () => {
 });
 
 describe("attack", () => {
-  it("hits, damages, and provokes a missed counterattack", () => {
+  it("hits bare-handed with target 10 and bonus damage", () => {
     const world = makeWorld();
     const state = makeState(world);
     // d20=17 hit (target 10), d4=2 -> 3 damage, enemy d20=5 miss (target 12).
@@ -399,13 +518,41 @@ describe("attack", () => {
     ]);
     expect(result.rolls[0]).toMatchObject({ sides: 20, value: 17 });
     expect(result.rolls[0]).toMatchObject({ target: 10, success: true });
-    expect(result.rolls[1]).toMatchObject({ sides: 4, value: 2 });
+    expect(result.rolls[1]).toMatchObject({ sides: 4, value: 2, bonus: 1 });
     expect(result.rolls[1]).toMatchObject({ target: 0, success: true });
     expect(result.rolls[2]).toMatchObject({ target: 12, success: false });
+    expect(result.events[0]).toBe("You fight bare-handed.");
     expect(state.enemies["goblin"]!.hp).toBe(2);
     expect(state.enemies["goblin"]!.defeated).toBe(false);
     expect(state.hp).toBe(10);
     expect(state.turn).toBe(1);
+  });
+
+  it("uses the best weapon: hit target 10 - attackBonus, damage d4+1+damageBonus", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.inventory.push("club", "dagger");
+    // dagger score 2 > club score 1, so dagger: target 9, bonus 2.
+    // d20=17 hit (target 9), d4=2 -> 4 damage, enemy d20=5 miss.
+    const result = attack(state, world, "goblin", seqRng([0.84, 0.3, 0.2]));
+    expect(result.ok).toBe(true);
+    expect(result.rolls[0]).toMatchObject({ target: 9, success: true });
+    expect(result.rolls[1]).toMatchObject({ sides: 4, value: 2, bonus: 2 });
+    expect(result.events[0]).toBe("You strike with the Dagger.");
+    expect(state.enemies["goblin"]!.hp).toBe(1);
+  });
+
+  it("hits on the lowered target with a weapon (roll 9 hits with dagger)", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.inventory.push("dagger");
+    // d20=9: miss bare-handed (target 10) but hit with dagger (target 9).
+    // d20 = 1 + floor(0.4*20) = 9; d4 = 1 + floor(0.3*4) = 2 -> 4 damage; enemy d20=5 miss.
+    const result = attack(state, world, "goblin", seqRng([0.4, 0.3, 0.2]));
+    expect(result.ok).toBe(true);
+    expect(result.rolls[0]).toMatchObject({ value: 9, target: 9, success: true });
+    expect(result.rolls[1]).toMatchObject({ bonus: 2 });
+    expect(state.enemies["goblin"]!.hp).toBe(1);
   });
 
   it("misses and takes counterattack damage clamped at 0", () => {
@@ -485,6 +632,47 @@ describe("attack", () => {
     expect(result.reason).toContain("already defeated");
     expect(state).toEqual(before);
     expect(state.turn).toBe(0);
+  });
+});
+
+describe("examine", () => {
+  it("describes an item in the room without changing state", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    const before = snapshot(state);
+    const result = examine(state, world, "torch");
+    expect(result.ok).toBe(true);
+    expect(result.action).toBe("examine");
+    expect(result.rolls).toEqual([]);
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0]).toContain("Torch");
+    expect(state).toEqual(before);
+    expect(state.turn).toBe(0);
+  });
+
+  it("describes an inventory item with bonuses and heal amounts", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.inventory.push("dagger", "draught");
+    const weapon = examine(state, world, "dagger");
+    expect(weapon.ok).toBe(true);
+    expect(weapon.events[0]).toContain("Dagger");
+    expect(weapon.events[0]).toContain("+1 attack");
+    expect(weapon.events[0]).toContain("+1 damage");
+    const potion = examine(state, world, "draught");
+    expect(potion.ok).toBe(true);
+    expect(potion.events[0]).toContain("4 HP");
+    expect(state.turn).toBe(0);
+  });
+
+  it("rejects unknown items without changing state", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    const before = snapshot(state);
+    const result = examine(state, world, "nope");
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("You don't see any nope here.");
+    expect(state).toEqual(before);
   });
 });
 
@@ -639,7 +827,7 @@ describe("trap", () => {
     // d4: 1 + floor(0.5 * 4) = 3.
     const result = move(state, world, "north", seqRng([0.5]));
     expect(result.ok).toBe(true);
-    expect(result.rolls).toEqual([{ purpose: "trap", sides: 4, value: 3, target: 0, success: true }]);
+    expect(result.rolls).toEqual([{ purpose: "trap", sides: 4, value: 3, target: 0, success: true, bonus: 0 }]);
     expect(state.hp).toBe(7);
     expect(state.flags["trap_sprung"]).toBe(true);
     expect(result.events).toContain("A trap springs! You take 3 damage.");
@@ -680,7 +868,7 @@ describe("trap", () => {
     const world = makeWorld();
     const state = makeTrapState(world);
     const result = move(state, world, " North ", seqRng([0.0]));
-    expect(result.rolls).toEqual([{ purpose: "trap", sides: 4, value: 1, target: 0, success: true }]);
+    expect(result.rolls).toEqual([{ purpose: "trap", sides: 4, value: 1, target: 0, success: true, bonus: 0 }]);
     expect(state.hp).toBe(9);
     expect(result.events).toContain("A trap springs! You take 1 damage.");
   });

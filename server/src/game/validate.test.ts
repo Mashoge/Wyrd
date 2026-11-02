@@ -243,4 +243,55 @@ describe("validateWorld", () => {
       errors.some((e) => e.includes('Item "silver_coin" appears more than once')),
     ).toBe(true);
   });
+
+  it("rejects an item with an invalid kind", () => {
+    const w = clone();
+    (w.items["silver_coin"] as { kind: string }).kind = "sword";
+    const errors = validateWorld(w);
+    expect(errors.some((e) => e.includes('Item "silver_coin" has invalid kind'))).toBe(true);
+  });
+
+  it("rejects negative and non-integer bonuses", () => {
+    const neg = clone();
+    neg.items["rusty_dagger"]!.attackBonus = -1;
+    expect(
+      validateWorld(neg).some((e) => e.includes("attackBonus")),
+    ).toBe(true);
+    const float = clone();
+    float.items["rusty_dagger"]!.damageBonus = 1.5;
+    expect(
+      validateWorld(float).some((e) => e.includes("damageBonus")),
+    ).toBe(true);
+    const heal = clone();
+    heal.items["healing_draught"]!.heal = 0;
+    expect(validateWorld(heal).some((e) => e.includes("heal"))).toBe(true);
+  });
+
+  it("rejects a weapon with no bonus", () => {
+    const w = clone();
+    w.items["rusty_dagger"]!.attackBonus = 0;
+    w.items["rusty_dagger"]!.damageBonus = 0;
+    const errors = validateWorld(w);
+    expect(errors.some((e) => e.includes('Weapon "rusty_dagger"'))).toBe(true);
+  });
+
+  it("rejects a consumable without heal > 0", () => {
+    const missing = clone();
+    delete missing.items["healing_draught"]!.heal;
+    expect(
+      validateWorld(missing).some((e) => e.includes('Consumable "healing_draught"')),
+    ).toBe(true);
+    const zero = clone();
+    zero.items["healing_draught"]!.heal = 0;
+    expect(
+      validateWorld(zero).some((e) => e.includes('Consumable "healing_draught"')),
+    ).toBe(true);
+  });
+
+  it("rejects an exit keyItemId that is not a key", () => {
+    const w = clone();
+    w.rooms["gate_hall"]!.exits[1].keyItemId = "silver_coin";
+    const errors = validateWorld(w);
+    expect(errors.some((e) => e.includes("is not a key"))).toBe(true);
+  });
 });

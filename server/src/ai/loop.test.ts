@@ -301,38 +301,54 @@ describe("GAME_MASTER_PROMPT playtest rules", () => {
     expect(GAME_MASTER_PROMPT).toContain("2-4 sentences");
     expect(GAME_MASTER_PROMPT).toContain("quirk");
   });
+
+  it("locks the bare-handed, defeated-enemy and free look/examine rules", () => {
+    expect(GAME_MASTER_PROMPT).toContain(
+      "The player fights bare-handed unless the inventory holds a weapon; never mention blades or weapons they do not have.",
+    );
+    expect(GAME_MASTER_PROMPT).toContain(
+      "Defeated enemies do not act and their quirks no longer apply.",
+    );
+    expect(GAME_MASTER_PROMPT).toContain(
+      'look and examine are free: they do not count as the one action, so "look around and go north" should look AND move.',
+    );
+    expect(GAME_MASTER_PROMPT).toContain("except look and examine are free");
+  });
 });
 
 describe("cli roll + reveal formatting", () => {
   it("formats attack rolls as hit/miss with their target", () => {
     expect(
-      formatRoll({ purpose: "player attack", sides: 20, value: 14, target: 10, success: true }),
+      formatRoll({ purpose: "player attack", sides: 20, value: 14, target: 10, success: true, bonus: 0 }),
     ).toBe("🎲 Attack roll: 14 (needed 10+) → hit");
     expect(
-      formatRoll({ purpose: "player attack", sides: 20, value: 3, target: 10, success: false }),
+      formatRoll({ purpose: "player attack", sides: 20, value: 3, target: 10, success: false, bonus: 0 }),
     ).toBe("🎲 Attack roll: 3 (needed 10+) → miss");
   });
 
   it("formats enemy attack, sneak, grab, damage and trap rolls", () => {
     expect(
-      formatRoll({ purpose: "enemy attack", sides: 20, value: 15, target: 12, success: true }),
+      formatRoll({ purpose: "enemy attack", sides: 20, value: 15, target: 12, success: true, bonus: 0 }),
     ).toBe("🎲 Enemy attack: 15 (needed 12+) → it hits you");
     expect(
-      formatRoll({ purpose: "enemy attack", sides: 20, value: 5, target: 12, success: false }),
+      formatRoll({ purpose: "enemy attack", sides: 20, value: 5, target: 12, success: false, bonus: 0 }),
     ).toBe("🎲 Enemy attack: 5 (needed 12+) → it misses");
-    expect(formatRoll({ purpose: "sneak", sides: 20, value: 17, target: 13, success: true })).toBe(
+    expect(formatRoll({ purpose: "sneak", sides: 20, value: 17, target: 13, success: true, bonus: 0 })).toBe(
       "🎲 Sneak roll: 17 (needed 13+) → success",
     );
-    expect(formatRoll({ purpose: "sneak", sides: 20, value: 3, target: 13, success: false })).toBe(
+    expect(formatRoll({ purpose: "sneak", sides: 20, value: 3, target: 13, success: false, bonus: 0 })).toBe(
       "🎲 Sneak roll: 3 (needed 13+) → fail",
     );
-    expect(formatRoll({ purpose: "grab", sides: 20, value: 17, target: 6, success: true })).toBe(
+    expect(formatRoll({ purpose: "grab", sides: 20, value: 17, target: 6, success: true, bonus: 0 })).toBe(
       "🎲 Grab roll: 17 (needed 6+) → success",
     );
-    expect(formatRoll({ purpose: "player damage", sides: 4, value: 4, target: 0, success: true })).toBe(
+    expect(formatRoll({ purpose: "player damage", sides: 4, value: 4, target: 0, success: true, bonus: 0 })).toBe(
       "🎲 Damage: 4",
     );
-    expect(formatRoll({ purpose: "trap", sides: 4, value: 3, target: 0, success: true })).toBe(
+    expect(formatRoll({ purpose: "player damage", sides: 4, value: 2, target: 0, success: true, bonus: 1 })).toBe(
+      "🎲 Damage: 2 + 1 = 3",
+    );
+    expect(formatRoll({ purpose: "trap", sides: 4, value: 3, target: 0, success: true, bonus: 0 })).toBe(
       "🎲 Trap: 3 damage",
     );
   });

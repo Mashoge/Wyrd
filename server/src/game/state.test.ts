@@ -45,6 +45,7 @@ function makeTestWorld(): World {
         id: "torch",
         name: "Torch",
         description: "A flickering torch.",
+        kind: "misc",
       },
     },
     enemies: {
@@ -78,6 +79,7 @@ describe("createGameState", () => {
     expect(state.status).toBe("playing");
     expect(state.flags).toEqual({});
     expect(state.lastRoomId).toBeNull();
+    expect(state.visitedRoomIds).toEqual(["entrance"]);
 
     // Rooms and enemies are copied over with equal content...
     expect(state.rooms).toEqual(world.rooms);
@@ -172,7 +174,7 @@ describe("startGame", () => {
         },
       },
       items: {
-        relic: { id: "relic", name: "Relic", description: "The relic." },
+        relic: { id: "relic", name: "Relic", description: "The relic.", kind: "treasure" },
       },
       enemies: {},
     };

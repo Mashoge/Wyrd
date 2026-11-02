@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attack, move, pickUp, sneak, useItem } from "../game/rules.js";
+import { attack, examine, move, pickUp, sneak, useItem } from "../game/rules.js";
 import { startGame } from "../game/state.js";
 import type { GameState, Rng, World } from "../game/types.js";
 import { sunkenCrypt } from "../game/worlds/sunkenCrypt.js";
@@ -24,9 +24,9 @@ function snapshot(state: GameState): GameState {
 }
 
 describe("TOOL_DEFINITIONS", () => {
-  it("exposes six tools with plain string params and no endTurn", () => {
+  it("exposes seven tools with plain string params and no endTurn", () => {
     const names = TOOL_DEFINITIONS.map((t) => t.function.name).sort();
-    expect(names).toEqual(["attack", "look", "move", "pick_up", "sneak", "use_item"]);
+    expect(names).toEqual(["attack", "examine", "look", "move", "pick_up", "sneak", "use_item"]);
     const blob = JSON.stringify(TOOL_DEFINITIONS);
     expect(blob).not.toContain("endTurn");
     expect(blob).not.toContain("end_turn");
@@ -70,6 +70,32 @@ describe("executeTool dispatch", () => {
     const result = executeTool(state, world, "use_item", '{"item_id":"iron_key","direction":"north"}', seqRng([]));
     expect(result).toEqual(expected);
     expect(result.ok).toBe(true);
+  });
+
+  it("use_item without direction heals a consumable", () => {
+    const { state, world } = freshGame();
+    state.hp = 6;
+    state.inventory.push("healing_draught");
+    const direct = structuredClone(state);
+    const expected = useItem(direct, world, "healing_draught");
+    const result = executeTool(state, world, "use_item", '{"item_id":"healing_draught"}', seqRng([]));
+    expect(result).toEqual(expected);
+    expect(result.ok).toBe(true);
+    expect(state.hp).toBe(10);
+  });
+
+  it("examine dispatches without changing state", () => {
+    const { state, world } = freshGame();
+    const direct = structuredClone(state);
+    const expected = examine(direct, world, "rusty_dagger");
+    const before = snapshot(state);
+    const result = executeTool(state, world, "examine", '{"item_id":"rusty_dagger"}', seqRng([]));
+    expect(result).toEqual(expected);
+    expect(result.ok).toBe(true);
+    expect(state).toEqual(before);
+    const bad = executeTool(state, world, "examine", '{"item_id":"nope"}', seqRng([]));
+    expect(bad.ok).toBe(false);
+    expect(bad.reason).toBe("You don't see any nope here.");
   });
 });
 
@@ -140,7 +166,7 @@ describe("executeTool arg validation and look", () => {
       ["move", '{"direction":"   "}'],
       ["pick_up", "{}"],
       ["pick_up", '{"item_id":null}'],
-      ["use_item", '{"item_id":"iron_key"}'],
+      ["examine", "{}"],
       ["attack", '{"enemy_id":""}'],
       ["sneak", '{"enemy_id":42}'],
       ["move", "[]"],
