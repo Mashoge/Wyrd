@@ -8,6 +8,8 @@ function makeTestWorld(): World {
     title: "Test World",
     startRoomId: "entrance",
     exitRoomId: "treasure",
+    relicItemId: "torch",
+    maxTurns: 20,
     rooms: {
       entrance: {
         id: "entrance",
@@ -39,6 +41,10 @@ function makeTestWorld(): World {
         hp: 5,
         attack: 2,
         defeated: false,
+        loot: [],
+        blocksRetreat: false,
+        alertness: 0,
+        quirk: "Picks its teeth.",
       },
     },
   };
@@ -58,6 +64,7 @@ describe("createGameState", () => {
     expect(state.turn).toBe(0);
     expect(state.status).toBe("playing");
     expect(state.flags).toEqual({});
+    expect(state.lastRoomId).toBeNull();
 
     // Rooms and enemies are copied over with equal content...
     expect(state.rooms).toEqual(world.rooms);
@@ -92,6 +99,10 @@ describe("createGameState", () => {
       hp: 100,
       attack: 20,
       defeated: false,
+      loot: [],
+      blocksRetreat: true,
+      alertness: 20,
+      quirk: "Counts its gold.",
     };
 
     // Original world must be untouched.

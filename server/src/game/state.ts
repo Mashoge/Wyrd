@@ -8,6 +8,7 @@ export function createGameState(world: World, sessionId: string): GameState {
     maxHp: 10,
     inventory: [],
     currentRoomId: world.startRoomId,
+    lastRoomId: null,
     rooms: structuredClone(world.rooms),
     enemies: structuredClone(world.enemies),
     flags: {},
