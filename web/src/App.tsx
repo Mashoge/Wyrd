@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, JSX, RefObject } from "react";
 import { motion } from "framer-motion";
 import { ApiError, bootGame, clearGameId, createGame, fetchGame, playTurn, saveGameId } from "./api";
-import type { GameStatus, PlayerView, ToolLogEntry } from "./api";
+import type { GameStatus, PlayerView, Suggestion, ToolLogEntry } from "./api";
 import { ActionForm } from "./components/ActionForm";
 import { Header } from "./components/Header";
 import { Sidebar } from "./components/Sidebar";
@@ -16,7 +16,11 @@ interface LoadedGame {
   status: GameStatus;
 }
 
-function freshTurn(playerText: string, narration: string, toolLog: ToolLogEntry[]): Turn {
+export function openingTurn(narration: string, toolLog: ToolLogEntry[]): Turn {
+  return { playerText: null, narration, toolLog };
+}
+
+function freshTurn(playerText: string | null, narration: string, toolLog: ToolLogEntry[]): Turn {
   return { playerText, narration, toolLog };
 }
 
@@ -24,13 +28,13 @@ export function App(): JSX.Element {
   const [game, setGame] = useState<LoadedGame | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [ledger, setLedger] = useState<ToolLogEntry[]>([]);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [busy, setBusy] = useState(false);
   const [booting, setBooting] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const feedRef = useRef<HTMLDivElement | null>(null);
   const busyRef = useRef(false);
   const gameRef = useRef<LoadedGame | null>(null);
+  const feedRef = useRef<HTMLDivElement | null>(null);
   gameRef.current = game;
 
   useEffect(() => {
@@ -42,8 +46,17 @@ export function App(): JSX.Element {
         const g = res.game;
         setGame({ gameId: g.gameId, commitment: g.commitment, view: g.view, status: g.status });
         if (res.fresh && "narration" in g) {
-          setTurns([freshTurn("Look around.", g.narration, g.toolLog)]);
+          setTurns([freshTurn(null, g.narration, g.toolLog)]);
           setLedger(g.toolLog);
+        } else if ("openingNarration" in g) {
+          const narration = g.openingNarration;
+          if (typeof narration === "string" && narration.length > 0) {
+            setTurns([openingTurn(narration, g.openingToolLog)]);
+            setLedger(g.openingToolLog);
+          } else {
+            setTurns([]);
+            setLedger([]);
+          }
         } else {
           setTurns([]);
           setLedger([]);
@@ -63,13 +76,18 @@ export function App(): JSX.Element {
 
   useEffect(() => {
     const el = feedRef.current;
-    if (el !== null) el.scrollTop = el.scrollHeight;
+    if (el === null) return;
+    const reduced =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ block: "end", behavior: reduced ? "auto" : "smooth" });
   }, [turns.length, busy]);
 
-  const applyFresh = useCallback((g: { gameId: string; commitment: string; view: PlayerView; status: GameStatus; narration: string; toolLog: ToolLogEntry[]; suggestions: string[] }): void => {
+  const applyFresh = useCallback((g: { gameId: string; commitment: string; view: PlayerView; status: GameStatus; narration: string; toolLog: ToolLogEntry[]; suggestions: Suggestion[] }): void => {
     saveGameId(g.gameId);
     setGame({ gameId: g.gameId, commitment: g.commitment, view: g.view, status: g.status });
-    setTurns([freshTurn("Look around.", g.narration, g.toolLog)]);
+    setTurns([freshTurn(null, g.narration, g.toolLog)]);
     setLedger(g.toolLog);
     setSuggestions(g.suggestions);
   }, []);
@@ -140,7 +158,7 @@ interface LayoutArgs {
   game: LoadedGame | null;
   turns: Turn[];
   ledger: ToolLogEntry[];
-  suggestions: string[];
+  suggestions: Suggestion[];
   busy: boolean;
   booting: boolean;
   error: string | null;
@@ -178,11 +196,16 @@ function AppLayout(args: LayoutArgs): JSX.Element {
         {game !== null && !booting && (
           <div className="wyrd-board" style={boardStyle}>
             <main style={mainStyle}>
-              <div ref={feedRef} aria-live="polite" style={feedStyle}>
+              <div aria-live="polite" style={feedStyle}>
                 <StoryFeed turns={turns} />
+                <div ref={feedRef} aria-hidden="true" style={feedAnchorStyle} />
               </div>
-              {!over && <Suggestions suggestions={suggestions} disabled={busy} onPick={(t) => void sendAction(t)} />}
-              {!over && <ActionForm disabled={busy} onSubmit={(t) => void sendAction(t)} />}
+              {!over && (
+                <div style={stickyBarStyle}>
+                  <Suggestions suggestions={suggestions} disabled={busy} onPick={(t) => void sendAction(t)} />
+                  <ActionForm disabled={busy} onSubmit={(t) => void sendAction(t)} />
+                </div>
+              )}
               {busy && <div className="font-story" style={busyStyle}>The game master weighs your fate…</div>}
             </main>
             <Sidebar view={game.view} status={game.status} ledger={ledger} />
@@ -199,7 +222,9 @@ const bootStyle: CSSProperties = { fontSize: 18, color: "#B9AEC0", fontStyle: "i
 const alertStyle: CSSProperties = { background: "#1A1421", borderLeft: "4px solid #FF6B5B", padding: "12px 16px", fontSize: 14 };
 const boardStyle: CSSProperties = { display: "flex", flexWrap: "wrap", gap: 24, alignItems: "flex-start" };
 const mainStyle: CSSProperties = { flex: "999 1 620px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 };
-const feedStyle: CSSProperties = { display: "flex", flexDirection: "column", gap: 16, maxHeight: "60vh", overflowY: "auto" };
+const feedStyle: CSSProperties = { display: "flex", flexDirection: "column", gap: 16 };
+const feedAnchorStyle: CSSProperties = { height: 1, scrollMarginBottom: 160 };
+const stickyBarStyle: CSSProperties = { position: "sticky", bottom: 0, background: "#1A1421", borderTop: "1px solid #5A4A68", padding: 12, display: "flex", flexDirection: "column", gap: 12 };
 const busyStyle: CSSProperties = { fontSize: 15, color: "#B9AEC0", fontStyle: "italic" };
 const newGameStyle: CSSProperties = { background: "#B44DFF", color: "#120E17", marginLeft: "auto" };
 const bannerSub: CSSProperties = { fontSize: 17, color: "#B9AEC0", fontStyle: "italic" };

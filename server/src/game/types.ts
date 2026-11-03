@@ -15,6 +15,8 @@ export interface Exit {
   to: string;
   locked?: boolean;
   keyItemId?: string;
+  /** Optional fixed danger hint shown to the player. Never hints at secrets. */
+  omen?: string;
 }
 
 export interface Enemy {

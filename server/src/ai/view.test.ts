@@ -80,6 +80,27 @@ describe("playerView leaks nothing", () => {
     expect(JSON.stringify(view.enemy)).not.toContain('"hp"');
   });
 
+  it("shows passed once sneaked past", () => {
+    const state = freshGame();
+    state.currentRoomId = "goblin_den";
+    let view = playerView(state, sunkenCrypt);
+    expect(view.enemy?.passed).toBe(false);
+    state.flags["sneaked:goblin_den"] = true;
+    view = playerView(state, sunkenCrypt);
+    expect(view.enemy?.passed).toBe(true);
+    expect(view.enemy?.defeated).toBe(false);
+  });
+
+  it("shows unlocked once a door is opened", () => {
+    const state = freshGame();
+    state.currentRoomId = "gate_hall";
+    let view = playerView(state, sunkenCrypt);
+    expect(view.exits.find((e) => e.direction === "north")?.unlocked).toBeUndefined();
+    state.flags["unlocked:gate_hall:north"] = true;
+    view = playerView(state, sunkenCrypt);
+    expect(view.exits.find((e) => e.direction === "north")?.unlocked).toBe(true);
+  });
+
   it("maps hp to condition labels", () => {
     expect(conditionFor(12, 12)).toBe("unhurt");
     expect(conditionFor(15, 15)).toBe("unhurt");
@@ -137,6 +158,25 @@ describe("playerView leaks nothing", () => {
         expect(json).not.toContain(room.name);
       }
     }
+  });
+
+  it("shows omens on the two fixed-danger exits and never hints at secrets", () => {
+    const state = freshGame();
+    state.currentRoomId = "hall";
+    const view = playerView(state, sunkenCrypt);
+    const byDirection = new Map(view.exits.map((e) => [e.direction, e]));
+    expect(byDirection.get("east")?.omen).toBe("Low chanting drifts from the east.");
+    expect(byDirection.get("south")?.omen).toBeUndefined();
+    expect(byDirection.get("west")?.omen).toBeUndefined();
+    expect(byDirection.get("north")?.omen).toBeUndefined();
+    state.currentRoomId = "goblin_den";
+    const den = playerView(state, sunkenCrypt);
+    const denBy = new Map(den.exits.map((e) => [e.direction, e]));
+    expect(denBy.get("north")?.omen).toBe("Something huge breathes slowly to the north.");
+    expect(denBy.get("south")?.omen).toBeUndefined();
+    const blob = JSON.stringify(view) + JSON.stringify(den);
+    expect(blob).not.toMatch(/relic/i);
+    expect(blob).not.toMatch(/trap/i);
   });
 });
 

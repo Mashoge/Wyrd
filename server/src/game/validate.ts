@@ -163,6 +163,13 @@ export function validateWorld(world: World): string[] {
           );
         }
       }
+      if (exit.omen !== undefined) {
+        if (typeof exit.omen !== "string" || exit.omen.trim().length === 0) {
+          errors.push(
+            `Room "${roomKey}" exit "${exit.direction}" has an invalid omen: must be a non-empty string when present.`,
+          );
+        }
+      }
       if (exit.locked === true && exit.keyItemId === undefined) {
         errors.push(
           `Room "${roomKey}" exit "${exit.direction}" is locked but has no keyItemId.`,

@@ -47,6 +47,7 @@ export function formatRoll(roll: DiceRoll): string {
 export interface PlainToolCall {
   label: string;
   accepted: boolean;
+  failed: boolean;
   detail: string;
 }
 
@@ -62,44 +63,69 @@ function prettyId(id: string): string {
     .join(" ");
 }
 
+function hasFailedPlayerRoll(rolls: DiceRoll[]): boolean {
+  for (const r of rolls) {
+    const purpose = r.purpose.trim().toLowerCase();
+    if (r.success) continue;
+    if (purpose === "player attack" || purpose === "sneak" || purpose === "grab") return true;
+  }
+  return false;
+}
+
 /** Tool call → plain words for the Ledger of fate. */
 export function toolToPlain(entry: ToolLogEntry): PlainToolCall {
   const accepted = entry.result.ok;
-  const detail = accepted ? "" : (entry.result.reason ?? "It did not work.");
+  const failed = accepted && hasFailedPlayerRoll(entry.result.rolls);
+  const detail = accepted
+    ? (failed ? entry.result.events.join(" ") : "")
+    : (entry.result.reason ?? "It did not work.");
   switch (entry.name) {
     case "move": {
       const dir = argText(entry.args, "direction") ?? "onward";
-      return { label: `Moved ${dir}`, accepted, detail };
+      return { label: `Moved ${dir}`, accepted, failed, detail };
     }
     case "pick_up": {
       const id = argText(entry.args, "item_id") ?? "item";
-      return { label: `Took the ${prettyId(id)}`, accepted, detail };
+      if (failed) return { label: `Failed to grab the ${prettyId(id)}`, accepted, failed, detail };
+      return { label: `Took the ${prettyId(id)}`, accepted, failed, detail };
     }
     case "use_item": {
       const id = argText(entry.args, "item_id") ?? "item";
       const dir = argText(entry.args, "direction");
+      if (!accepted) {
+        return {
+          label: dir !== null ? `Used the ${prettyId(id)} to the ${dir}` : `Used the ${prettyId(id)}`,
+          accepted,
+          failed,
+          detail,
+        };
+      }
+      if (failed) return { label: `Failed to ${prettyId(entry.name)}`, accepted, failed, detail };
       return {
         label: dir !== null ? `Used the ${prettyId(id)} to the ${dir}` : `Used the ${prettyId(id)}`,
         accepted,
+        failed,
         detail,
       };
     }
     case "attack": {
       const id = argText(entry.args, "enemy_id") ?? "enemy";
-      return { label: `Struck the ${prettyId(id)}`, accepted, detail };
+      if (failed) return { label: `Missed the ${prettyId(id)}`, accepted, failed, detail };
+      return { label: `Struck the ${prettyId(id)}`, accepted, failed, detail };
     }
     case "sneak": {
       const id = argText(entry.args, "enemy_id") ?? "enemy";
-      return { label: `Sneaked past the ${prettyId(id)}`, accepted, detail };
+      if (failed) return { label: `Failed to sneak past the ${prettyId(id)}`, accepted, failed, detail };
+      return { label: `Sneaked past the ${prettyId(id)}`, accepted, failed, detail };
     }
     case "look":
-      return { label: "Looked around", accepted, detail };
+      return { label: "Looked around", accepted, failed, detail };
     case "examine": {
       const id = argText(entry.args, "item_id") ?? "item";
-      return { label: `Examined the ${prettyId(id)}`, accepted, detail };
+      return { label: `Examined the ${prettyId(id)}`, accepted, failed, detail };
     }
     default:
-      return { label: accepted ? `Did ${prettyId(entry.name)}` : `Claimed ${prettyId(entry.name)}`, accepted, detail };
+      return { label: accepted ? (failed ? `Failed to ${prettyId(entry.name)}` : `Did ${prettyId(entry.name)}`) : `Claimed ${prettyId(entry.name)}`, accepted, failed, detail };
   }
 }
 

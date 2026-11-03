@@ -9,8 +9,22 @@ function reject(action: string, reason: string): ToolResult {
   return { ok: false, action, reason, rolls: [], events: [] };
 }
 
+function humanizeId(id: string): string {
+  return id.replace(/_+/g, " ").trim();
+}
+
+function displayItemName(world: World, itemId: string): string {
+  return world.items[itemId]?.name ?? humanizeId(itemId);
+}
+
+function displayEnemyName(world: World, state: GameState, enemyId: string): string {
+  const fromState = state.enemies[enemyId]?.name;
+  if (typeof fromState === "string" && fromState.length > 0) return fromState;
+  return world.enemies[enemyId]?.name ?? humanizeId(enemyId);
+}
+
 function itemName(world: World, itemId: string): string {
-  return world.items[itemId]?.name ?? itemId;
+  return world.items[itemId]?.name ?? humanizeId(itemId);
 }
 
 function bestWeapon(world: World, state: GameState): Item | undefined {
@@ -33,11 +47,11 @@ export function examine(state: GameState, world: World, itemId: string): ToolRes
   const inRoom = room !== undefined && room.items.includes(itemId);
   const inInventory = state.inventory.includes(itemId);
   if (!inRoom && !inInventory) {
-    return reject("examine", `You don't see any ${itemId} here.`);
+    return reject("examine", `You don't see any ${displayItemName(world, itemId)} here.`);
   }
   const item = world.items[itemId];
   if (item === undefined) {
-    return reject("examine", `You don't see any ${itemId} here.`);
+    return reject("examine", `You don't see any ${displayItemName(world, itemId)} here.`);
   }
   let detail = `${item.name}: ${item.description}`;
   if (item.kind === "weapon") {
@@ -172,7 +186,7 @@ export function pickUp(state: GameState, world: World, itemId: string, rng: Rng)
   }
   const index = room.items.indexOf(itemId);
   if (index === -1) {
-    return reject("pickUp", `There is no ${itemName(world, itemId)} here.`);
+    return reject("pickUp", `There is no ${displayItemName(world, itemId)} here.`);
   }
   const watcher =
     room.enemyId !== undefined ? state.enemies[room.enemyId] : undefined;
@@ -256,6 +270,7 @@ export function useItem(
     );
   }
   exit.locked = false;
+  state.flags[`unlocked:${room.id}:${direction}`] = true;
   const events = [`You unlocked the door to the ${direction}.`];
   events.push(...endTurn(state, world));
   return { ok: true, action: "useItem", rolls: [], events };
@@ -273,7 +288,7 @@ export function attack(
   const room = state.rooms[state.currentRoomId];
   const enemy = state.enemies[enemyId];
   if (room === undefined || enemy === undefined || room.enemyId !== enemyId) {
-    return reject("attack", `There is no ${enemyId} here.`);
+    return reject("attack", `There is no ${displayEnemyName(world, state, enemyId)} here.`);
   }
   if (enemy.defeated) {
     return reject("attack", `The ${enemy.name} is already defeated.`);
@@ -328,7 +343,7 @@ export function sneak(
   const room = state.rooms[state.currentRoomId];
   const enemy = state.enemies[enemyId];
   if (room === undefined || enemy === undefined || room.enemyId !== enemyId) {
-    return reject("sneak", `There is no ${enemyId} here.`);
+    return reject("sneak", `There is no ${displayEnemyName(world, state, enemyId)} here.`);
   }
   if (enemy.defeated) {
     return reject("sneak", `The ${enemy.name} is already defeated.`);

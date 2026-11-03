@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { Rng, Secrets, World } from "./types.js";
+import { RULES_VERSION } from "./version.js";
 
 /**
  * Pick the hidden relic room and the hidden trap.
@@ -33,12 +34,13 @@ export function chooseSecrets(world: World, rng: Rng): Secrets {
  *
  * DOCUMENTED FORMAT (the browser recomputes this later to verify):
  *   JSON.stringify of an object built with this FIXED key order:
- *     { relicRoomId, trapRoomId, trapDirection, salt }
+ *     { rulesVersion, relicRoomId, trapRoomId, trapDirection, salt }
  * Example:
- *   {"relicRoomId":"library","trapRoomId":"hall","trapDirection":"east","salt":"abc123"}
+ *   {"rulesVersion":"wyrd-rules-v1","relicRoomId":"library","trapRoomId":"hall","trapDirection":"east","salt":"abc123"}
  */
 export function canonicalSecrets(secrets: Secrets, salt: string): string {
   return JSON.stringify({
+    rulesVersion: RULES_VERSION,
     relicRoomId: secrets.relicRoomId,
     trapRoomId: secrets.trap.roomId,
     trapDirection: secrets.trap.direction,

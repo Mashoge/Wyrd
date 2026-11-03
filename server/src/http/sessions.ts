@@ -1,9 +1,11 @@
-import type { TurnSession } from "../ai/loop.js";
+import type { ToolLogEntry, TurnSession } from "../ai/loop.js";
 
 export interface SessionEntry {
   session: TurnSession;
   lastActive: number;
   busy: boolean;
+  openingNarration?: string;
+  openingToolLog?: ToolLogEntry[];
 }
 
 export interface SessionStoreOptions {

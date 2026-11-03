@@ -294,4 +294,10 @@ describe("validateWorld", () => {
     const errors = validateWorld(w);
     expect(errors.some((e) => e.includes("is not a key"))).toBe(true);
   });
+
+  it("rejects an invalid omen", () => {
+    const w = clone();
+    w.rooms["hall"]!.exits[1].omen = "   ";
+    expect(validateWorld(w).some((e) => e.includes("omen"))).toBe(true);
+  });
 });

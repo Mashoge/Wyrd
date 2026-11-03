@@ -4,7 +4,7 @@ import type { ToolLogEntry } from "../api";
 import { RollRows } from "./RollRows";
 
 export interface Turn {
-  playerText: string;
+  playerText: string | null;
   narration: string;
   toolLog: ToolLogEntry[];
 }
@@ -22,15 +22,17 @@ export function StoryFeed({ turns }: Props): JSX.Element {
         const rolls = t.toolLog.flatMap((e) => e.result.rolls);
         return (
           <div key={i} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <div
-              className="font-story"
-              style={{
-                alignSelf: "flex-end", maxWidth: "70%", fontStyle: "italic",
-                fontSize: 17, color: "#D9A6FF", textAlign: "right",
-              }}
-            >
-              — {t.playerText}
-            </div>
+            {t.playerText !== null && (
+              <div
+                className="font-story"
+                style={{
+                  alignSelf: "flex-end", maxWidth: "70%", fontStyle: "italic",
+                  fontSize: 17, color: "#D9A6FF", textAlign: "right",
+                }}
+              >
+                — {t.playerText}
+              </div>
+            )}
             <RollRows rolls={rolls} />
             {latest ? (
               <motion.article

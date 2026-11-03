@@ -105,7 +105,11 @@ function describeLook(state: GameState, world: World): string {
   if (view.exits.length === 0) {
     lines.push("There are no visible exits.");
   } else {
-    const parts = view.exits.map((e) => `${e.direction} (${e.locked ? "locked" : "open"})`);
+    const parts = view.exits.map((e) =>
+      e.omen !== undefined
+        ? `${e.direction} (${e.locked ? "locked" : "open"}) — ${e.omen}`
+        : `${e.direction} (${e.locked ? "locked" : "open"})`,
+    );
     lines.push(`Exits: ${parts.join(", ")}.`);
   }
   if (view.items.length === 0) {

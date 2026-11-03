@@ -13,7 +13,7 @@ interface Props {
 
 export function Sidebar({ view, status, ledger }: Props): JSX.Element {
   return (
-    <aside style={{ flex: "1 1 340px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+    <aside className="wyrd-sidebar" style={{ flex: "1 1 340px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
       <EnemyCard enemy={view.enemy} />
       <YouPanel view={view} />
       <Ledger log={ledger} />

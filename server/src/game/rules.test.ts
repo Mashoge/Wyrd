@@ -746,6 +746,38 @@ describe("sneak", () => {
   });
 });
 
+describe("humanized names", () => {
+  it("humanizes unknown ids with spaces and no underscores", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    const attacked = attack(state, world, "legendary_sword", seqRng([]));
+    expect(attacked.ok).toBe(false);
+    expect(attacked.reason).toBe("There is no legendary sword here.");
+    expect(attacked.reason).not.toContain("_");
+    const sneaked = sneak(state, world, "shadow_beast", seqRng([]));
+    expect(sneaked.ok).toBe(false);
+    expect(sneaked.reason).toBe("There is no shadow beast here.");
+    const grabbed = pickUp(state, world, "legendary_sword", seqRng([]));
+    expect(grabbed.ok).toBe(false);
+    expect(grabbed.reason).toBe("There is no legendary sword here.");
+    const looked = examine(state, world, "legendary_sword");
+    expect(looked.ok).toBe(false);
+    expect(looked.reason).toBe("You don't see any legendary sword here.");
+    const notHeld = useItem(state, world, "legendary_sword", "east");
+    expect(notHeld.ok).toBe(false);
+    expect(notHeld.reason).toBe("You do not have the legendary sword.");
+  });
+
+  it("unlocking a door records an unlocked flag", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.inventory.push("key");
+    const result = useItem(state, world, "key", "east");
+    expect(result.ok).toBe(true);
+    expect(state.flags["unlocked:entrance:east"]).toBe(true);
+  });
+});
+
 describe("endTurn / win / lose", () => {
   it("wins when holding the relic in the exit room", () => {
     const world = makeWorld();

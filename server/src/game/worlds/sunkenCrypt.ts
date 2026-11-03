@@ -28,7 +28,7 @@ export const sunkenCrypt: World = {
       items: [],
       exits: [
         { direction: "south", to: "entrance" },
-        { direction: "east", to: "ossuary" },
+        { direction: "east", to: "ossuary", omen: "Low chanting drifts from the east." },
         { direction: "west", to: "flooded_chapel" },
         { direction: "north", to: "goblin_den" },
       ],
@@ -65,7 +65,7 @@ export const sunkenCrypt: World = {
       items: ["silver_coin", "thigh_bone"],
       exits: [
         { direction: "south", to: "hall" },
-        { direction: "north", to: "gate_hall" },
+        { direction: "north", to: "gate_hall", omen: "Something huge breathes slowly to the north." },
       ],
       enemyId: "goblin",
     },

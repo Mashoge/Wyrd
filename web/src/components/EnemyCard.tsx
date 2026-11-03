@@ -33,6 +33,11 @@ export function EnemyCard({ enemy }: { enemy: PlayerViewEnemy | null }): JSX.Ele
       <div className="font-story" style={{ fontSize: 16, color: "#B9AEC0", fontStyle: "italic" }}>
         {enemy.quirk.endsWith(".") ? enemy.quirk : `${enemy.quirk}.`}
       </div>
+      {enemy.passed && !enemy.defeated && (
+        <div style={{ fontSize: 13, color: "#B9AEC0", fontStyle: "italic" }}>
+          You slipped past it
+        </div>
+      )}
     </section>
   );
 }

@@ -12,6 +12,15 @@ function entry(name: string, args: Record<string, unknown>, ok: boolean, reason?
   return { name, args, result: { ok, action: name, reason, rolls: [], events: [] } };
 }
 
+function entryWithRolls(
+  name: string,
+  args: Record<string, unknown>,
+  rolls: DiceRoll[],
+  events: string[] = [],
+): ToolLogEntry {
+  return { name, args, result: { ok: true, action: name, rolls, events } };
+}
+
 describe("formatRoll", () => {
   it("formats attack hits and misses with their target", () => {
     expect(formatRoll(roll({ purpose: "player attack", value: 17, target: 9, success: true }))).toBe(
@@ -56,8 +65,68 @@ describe("toolToPlain", () => {
   it("keeps the claim struck through with a REFUSED reason", () => {
     const plain = toolToPlain(entry("pick_up", { item_id: "legendary_sword" }, false, "There is none here."));
     expect(plain.accepted).toBe(false);
+    expect(plain.failed).toBe(false);
     expect(plain.label).toBe("Took the Legendary Sword");
     expect(plain.detail).toBe("There is none here.");
+  });
+
+  it("marks failed player rolls as failed without REFUSED", () => {
+    const miss = toolToPlain(
+      entryWithRolls(
+        "attack",
+        { enemy_id: "goblin" },
+        [roll({ purpose: "player attack", value: 3, target: 9, success: false })],
+        ["You missed the Goblin."],
+      ),
+    );
+    expect(miss.accepted).toBe(true);
+    expect(miss.failed).toBe(true);
+    expect(miss.label).toBe("Missed the Goblin");
+    expect(miss.detail).toBe("You missed the Goblin.");
+
+    const sneakFail = toolToPlain(
+      entryWithRolls(
+        "sneak",
+        { enemy_id: "goblin" },
+        [roll({ purpose: "sneak", value: 3, target: 13, success: false })],
+        ["You failed to sneak past the Goblin."],
+      ),
+    );
+    expect(sneakFail.accepted).toBe(true);
+    expect(sneakFail.failed).toBe(true);
+    expect(sneakFail.label).toBe("Failed to sneak past the Goblin");
+
+    const grabFail = toolToPlain(
+      entryWithRolls(
+        "pick_up",
+        { item_id: "silver_coin" },
+        [roll({ purpose: "grab", value: 4, target: 9, success: false })],
+        ["The Goblin noticed you!"],
+      ),
+    );
+    expect(grabFail.accepted).toBe(true);
+    expect(grabFail.failed).toBe(true);
+    expect(grabFail.label).toBe("Failed to grab the Silver Coin");
+  });
+
+  it("keeps success checks and ignores enemy misses", () => {
+    const hit = toolToPlain(
+      entryWithRolls("attack", { enemy_id: "goblin" }, [
+        roll({ purpose: "player attack", value: 17, target: 9, success: true }),
+      ]),
+    );
+    expect(hit.accepted).toBe(true);
+    expect(hit.failed).toBe(false);
+    expect(hit.label).toBe("Struck the Goblin");
+
+    const enemyMiss = toolToPlain(
+      entryWithRolls("attack", { enemy_id: "goblin" }, [
+        roll({ purpose: "player attack", value: 17, target: 9, success: true }),
+        roll({ purpose: "enemy attack", value: 5, target: 12, success: false }),
+      ]),
+    );
+    expect(enemyMiss.failed).toBe(false);
+    expect(enemyMiss.label).toBe("Struck the Goblin");
   });
 });
 

@@ -6,6 +6,8 @@ export interface PlayerViewExit {
   direction: string;
   locked: boolean;
   leadsTo?: string;
+  omen?: string;
+  unlocked?: boolean;
 }
 
 export interface PlayerViewItem {
@@ -19,6 +21,7 @@ export interface PlayerViewEnemy {
   quirk: string;
   defeated: boolean;
   condition: ConditionLabel;
+  passed: boolean;
 }
 
 export interface PlayerViewPlayer {
@@ -73,10 +76,17 @@ export function playerView(state: GameState, world: World): PlayerView {
 
   const exits: PlayerViewExit[] = room.exits.map((e) => {
     const dest = state.rooms[e.to];
-    if (dest !== undefined && state.visitedRoomIds.includes(e.to)) {
-      return { direction: e.direction, locked: e.locked === true, leadsTo: dest.name };
+    const base: PlayerViewExit =
+      dest !== undefined && state.visitedRoomIds.includes(e.to)
+        ? { direction: e.direction, locked: e.locked === true, leadsTo: dest.name }
+        : { direction: e.direction, locked: e.locked === true };
+    if (state.flags[`unlocked:${room.id}:${e.direction}`] === true) {
+      base.unlocked = true;
     }
-    return { direction: e.direction, locked: e.locked === true };
+    if (e.omen !== undefined) {
+      base.omen = e.omen;
+    }
+    return base;
   });
 
   const items: PlayerViewItem[] = room.items.map((id) => itemView(world, id));
@@ -92,6 +102,7 @@ export function playerView(state: GameState, world: World): PlayerView {
         quirk: foe.quirk,
         defeated: foe.defeated,
         condition: conditionFor(foe.hp, maxHp, foe.defeated),
+        passed: state.flags[`sneaked:${room.id}`] === true && !foe.defeated,
       };
     }
   }

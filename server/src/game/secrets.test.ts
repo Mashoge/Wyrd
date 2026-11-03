@@ -6,6 +6,7 @@ import {
   newSalt,
   verify,
 } from "./secrets.js";
+import { RULES_VERSION } from "./version.js";
 import type { Rng, Secrets, World } from "./types.js";
 
 function seqRng(values: number[]): Rng {
@@ -176,6 +177,10 @@ describe("commit / verify", () => {
 });
 
 describe("canonicalSecrets", () => {
+  it("pins the rules version first", () => {
+    expect(RULES_VERSION).toBe("wyrd-rules-v1");
+  });
+
   it("uses exactly the documented key order", () => {
     const secrets: Secrets = {
       relicRoomId: "library",
@@ -183,14 +188,16 @@ describe("canonicalSecrets", () => {
     };
     const salt = "abc123";
     expect(canonicalSecrets(secrets, salt)).toBe(
-      '{"relicRoomId":"library","trapRoomId":"hall","trapDirection":"east","salt":"abc123"}',
+      '{"rulesVersion":"wyrd-rules-v1","relicRoomId":"library","trapRoomId":"hall","trapDirection":"east","salt":"abc123"}',
     );
     const canonical = canonicalSecrets(secrets, salt);
+    const versionIdx = canonical.indexOf('"rulesVersion"');
     const relicIdx = canonical.indexOf('"relicRoomId"');
     const roomIdx = canonical.indexOf('"trapRoomId"');
     const dirIdx = canonical.indexOf('"trapDirection"');
     const saltIdx = canonical.indexOf('"salt"');
-    expect(relicIdx).toBeGreaterThanOrEqual(0);
+    expect(versionIdx).toBeGreaterThanOrEqual(0);
+    expect(relicIdx).toBeGreaterThan(versionIdx);
     expect(roomIdx).toBeGreaterThan(relicIdx);
     expect(dirIdx).toBeGreaterThan(roomIdx);
     expect(saltIdx).toBeGreaterThan(dirIdx);

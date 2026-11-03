@@ -122,6 +122,21 @@ describe("health + game lifecycle", () => {
     deps.store.stop();
   });
 
+  it("resume returns the stored opening narration and toolLog", async () => {
+    const client = new FakeClient();
+    client.script = [{ content: "Dark steps descend." }];
+    const deps = makeDeps(client, { ms: 0 });
+    const app = createApp(deps);
+    const created = await request(app).post("/api/games");
+    expect(created.status).toBe(201);
+    const gameId = created.body.gameId as string;
+    const resumed = await request(app).get(`/api/games/${gameId}`);
+    expect(resumed.status).toBe(200);
+    expect(resumed.body.openingNarration).toBe(created.body.narration);
+    expect(resumed.body.openingToolLog).toEqual(created.body.toolLog);
+    deps.store.stop();
+  });
+
   it("every game response includes 2-4 valid suggestions and no leaks", async () => {
     const client = new FakeClient();
     client.script = [{ content: "Opening." }, { content: "You wait." }];
@@ -141,7 +156,10 @@ describe("health + game lifecycle", () => {
       expect(suggestions.length).toBeGreaterThanOrEqual(2);
       expect(suggestions.length).toBeLessThanOrEqual(4);
       for (const s of suggestions) {
-        expect(typeof s).toBe("string");
+        const rec = s as { text?: unknown; kind?: unknown; target?: unknown };
+        expect(typeof rec.text).toBe("string");
+        expect(typeof rec.kind).toBe("string");
+        if (rec.target !== undefined) expect(typeof rec.target).toBe("number");
       }
       const blob = JSON.stringify(body);
       expect(blob).not.toContain("lost_relic");
@@ -277,7 +295,7 @@ describe("errors", () => {
 });
 
 describe("reveal after forced loss", () => {
-  it("returns raw + display secrets, salt, verified:true, nearMiss", async () => {
+  it("returns raw + display secrets, salt, verified:true, nearMiss, rulesVersion, tip", async () => {
     const client = new FakeClient();
     client.script = [{ content: "Opening." }];
     const deps = makeDeps(client, { ms: 0 });
@@ -313,6 +331,10 @@ describe("reveal after forced loss", () => {
     expect(res.body.verified).toBe(true);
     expect(verifyCommit(st.secrets, res.body.salt as string, res.body.commitment as string)).toBe(true);
     expect(typeof res.body.nearMiss === "string" || res.body.nearMiss === null).toBe(true);
+    expect(res.body.rulesVersion).toBe("wyrd-rules-v1");
+    expect(res.body.tip).toBe(
+      "Pick up several things in one go: 'grab the key and the coin'.",
+    );
     deps.store.stop();
   });
 });

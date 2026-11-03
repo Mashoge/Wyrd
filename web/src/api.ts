@@ -1,4 +1,4 @@
-import type { DiceRoll, NewGameResponse, PlayerView, ResumeResponse } from "./api-types";
+import type { DiceRoll, NewGameResponse, PlayerView, ResumeResponse, Suggestion } from "./api-types";
 import type { ToolLogEntry, ToolResult, TurnResponse } from "./api-types";
 import { ApiError, apiBaseUrl, clearGameId } from "./api-base";
 import { loadGameId, saveGameId } from "./api-base";
@@ -15,6 +15,7 @@ export type {
   PlayerViewPlayer,
   PlayerViewRoom,
   ResumeResponse,
+  Suggestion,
   ToolLogEntry,
   ToolResult,
   TurnResponse,
@@ -72,11 +73,21 @@ function toStatus(value: unknown): PlayerView["player"]["status"] {
   return "playing";
 }
 
-function toSuggestions(value: unknown): string[] {
+function toSuggestions(value: unknown): Suggestion[] {
   if (!Array.isArray(value)) return [];
-  const out: string[] = [];
+  const out: Suggestion[] = [];
   for (const s of value) {
-    if (typeof s === "string") out.push(s);
+    if (typeof s === "string") {
+      out.push({ text: s, kind: "other" });
+      continue;
+    }
+    if (!isRecord(s)) continue;
+    const text = s["text"];
+    const kind = s["kind"];
+    const target = s["target"];
+    if (typeof text !== "string" || typeof kind !== "string") continue;
+    if (target !== undefined && typeof target !== "number") continue;
+    out.push(target === undefined ? { text, kind } : { text, kind, target });
   }
   return out;
 }
@@ -181,12 +192,15 @@ export async function fetchGame(gameId: string): Promise<ResumeResponse> {
   const view = toPlayerView(body["view"]);
   if (typeof body["commitment"] !== "string") throw new ApiError(502, "Bad game.");
   if (view === null) throw new ApiError(502, "Bad game.");
+  if (typeof body["openingNarration"] !== "string") throw new ApiError(502, "Bad game.");
   return {
     gameId: typeof body["gameId"] === "string" ? body["gameId"] : gameId,
     commitment: body["commitment"],
     view,
     status: toStatus(body["status"]),
     suggestions: toSuggestions(body["suggestions"]),
+    openingNarration: body["openingNarration"],
+    openingToolLog: toToolLog(body["openingToolLog"]),
   };
 }
 

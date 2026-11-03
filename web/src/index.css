@@ -133,3 +133,32 @@ body {
     transition: none !important;
   }
 }
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #b44dff #120e17;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #120e17;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #b44dff;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3a2848;
+}
+
+@media (min-width: 901px) {
+  .wyrd-sidebar {
+    position: sticky;
+    top: 16px;
+  }
+}

@@ -30,12 +30,16 @@ export function ActionForm({ disabled, onSubmit }: Props): JSX.Element {
         id="wyrd-action"
         type="text"
         className="wyrd-input"
-        placeholder="I take the key and head for the gate"
+        placeholder="What do you do?"
         value={value}
         disabled={disabled}
         onChange={(e) => setValue(e.target.value)}
         style={{ flex: 1, minWidth: 220 }}
         maxLength={500}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
       />
       <button
         type="submit"

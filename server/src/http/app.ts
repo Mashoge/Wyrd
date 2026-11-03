@@ -5,9 +5,11 @@ import { runTurn, type TurnClient } from "../ai/loop.js";
 import { suggestActions } from "../ai/suggest.js";
 import { executeTool } from "../ai/tools.js";
 import { playerView, type PlayerView } from "../ai/view.js";
+import { RULES_VERSION } from "../game/version.js";
 import { nearMissMessage } from "../game/distance.js";
 import { verify } from "../game/secrets.js";
 import { startGame } from "../game/state.js";
+import { lossTip } from "../game/tips.js";
 import type { GameStatus, Rng } from "../game/types.js";
 import { sunkenCrypt } from "../game/worlds/sunkenCrypt.js";
 import { SessionStore } from "./sessions.js";
@@ -118,6 +120,8 @@ export function createApp(deps: AppDeps): Express {
     entry.busy = true;
     try {
       const result = await runTurn(session, "Look around.", { client: deps.client, rng });
+      entry.openingNarration = result.narration;
+      entry.openingToolLog = result.toolLog;
       deps.store.touch(gameId);
       res.status(201).json({
         gameId,
@@ -137,6 +141,8 @@ export function createApp(deps: AppDeps): Express {
       );
       const view: PlayerView = playerView(state, sunkenCrypt);
       const status: GameStatus = state.status;
+      entry.openingNarration = narration;
+      entry.openingToolLog = [];
       deps.store.touch(gameId);
       res.status(201).json({
         gameId,
@@ -217,6 +223,8 @@ export function createApp(deps: AppDeps): Express {
       view: resumeView,
       status: state.status,
       suggestions: suggestActions(resumeView, world),
+      openingNarration: entry.openingNarration ?? "",
+      openingToolLog: entry.openingToolLog ?? [],
     });
   });
 
@@ -236,6 +244,7 @@ export function createApp(deps: AppDeps): Express {
     const relicRoomName = world.rooms[state.secrets.relicRoomId]?.name;
     const trapRoomName = world.rooms[state.secrets.trap.roomId]?.name;
     res.json({
+      rulesVersion: RULES_VERSION,
       secrets: {
         relicRoomId: state.secrets.relicRoomId,
         trap: { roomId: state.secrets.trap.roomId, direction: state.secrets.trap.direction },
@@ -249,6 +258,7 @@ export function createApp(deps: AppDeps): Express {
       commitment: state.commitment,
       verified: verify(state.secrets, state.salt, state.commitment),
       nearMiss: nearMissMessage(state, world),
+      tip: state.status === "lost" ? lossTip(state, world) : null,
     });
   });
 
