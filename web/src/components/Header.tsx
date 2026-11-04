@@ -6,9 +6,10 @@ interface Props {
   verified: boolean;
   inspectorOn?: boolean;
   onToggleInspector?: () => void;
+  onOpenHelp?: () => void;
 }
 
-export function Header({ commitment, verified, inspectorOn = false, onToggleInspector }: Props): JSX.Element {
+export function Header({ commitment, verified, inspectorOn = false, onToggleInspector, onOpenHelp }: Props): JSX.Element {
   return (
     <header
       style={{
@@ -35,6 +36,30 @@ export function Header({ commitment, verified, inspectorOn = false, onToggleInsp
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <button
           type="button"
+          aria-label="How to play"
+          title="How to play"
+          onClick={onOpenHelp}
+          style={{
+            background: "transparent",
+            color: "#F4EFF6",
+            border: "1px solid #5A4A68",
+            borderRadius: "50%",
+            fontFamily: "Inter,sans-serif",
+            fontSize: 16,
+            fontWeight: 600,
+            width: 44,
+            height: 44,
+            minWidth: 44,
+            minHeight: 44,
+            padding: 0,
+            cursor: "pointer",
+            flexShrink: 0,
+          }}
+        >
+          ?
+        </button>
+        <button
+          type="button"
           aria-pressed={inspectorOn}
           onClick={onToggleInspector}
           style={{
@@ -51,7 +76,7 @@ export function Header({ commitment, verified, inspectorOn = false, onToggleInsp
         >
           Inspector
         </button>
-        <svg width="46" height="46" viewBox="0 0 48 48" role="img" aria-label={verified ? "Seal, fate verified" : "Seal, fate sealed"}>
+        <svg width="46" height="46" viewBox="0 0 48 48" role="img" aria-label={verified ? "Seal matches" : "Fate sealed"}>
           {verified ? (
             <g>
               <path d="M24 2 L24 46 L5 35 L5 13 Z" fill="#3A2848" stroke="#4DE8B5" strokeWidth="2" transform="translate(-2,0)" />
@@ -65,8 +90,13 @@ export function Header({ commitment, verified, inspectorOn = false, onToggleInsp
         </svg>
         <div style={{ display: "flex", flexDirection: "column" }}>
           <span className="font-title" style={{ fontSize: 12, color: verified ? "#4DE8B5" : "#B9AEC0" }}>
-            {verified ? "Fate verified" : "Fate sealed"}
+            {verified ? "Seal matches" : "Fate sealed"}
           </span>
+          {!verified && (
+            <span style={{ fontFamily: "Inter,sans-serif", fontSize: 11, color: "#B9AEC0" }}>
+              Relic &amp; trap locked
+            </span>
+          )}
           <span style={{ fontFamily: "ui-monospace,Menlo,monospace", fontSize: 12, color: "#F4EFF6" }}>
             {shortCommit(commitment)}
           </span>

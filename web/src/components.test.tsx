@@ -203,11 +203,82 @@ describe("WhereYouAre mini-map", () => {
 });
 
 describe("Ledger failed state", () => {
-  it("marks a failed player roll without REFUSED", () => {
+  function refusedClaim(): ToolLogEntry {
+    return {
+      name: "pick_up",
+      args: { item_id: "legendary_sword" },
+      result: {
+        ok: false,
+        action: "pick_up",
+        reason: "There is no Legendary Sword here. The Crypt Warden watches you closely.",
+        rolls: [],
+        events: [],
+      },
+    };
+  }
+
+  function partialAttempt(): ToolLogEntry {
+    return {
+      name: "attempt",
+      args: { target: "goblin" },
+      result: {
+        ok: true,
+        action: "attempt",
+        rolls: [{ purpose: "attempt", sides: 20, value: 7, target: 12, success: false, bonus: 0, result: "partial" }],
+        events: ["You partly distract the Goblin."],
+      },
+    };
+  }
+
+  it("keeps failed rolls to one muted line with the roll appended", () => {
     const html = renderToStaticMarkup(<Ledger log={[failedAttack()]} />);
-    expect(html).toContain("Missed the Goblin");
-    expect(html).toContain("Failed");
+    expect(html).toContain("Missed the Goblin · 3 vs 9+");
+    expect(html).toContain("#B9AEC0");
     expect(html).not.toContain("Refused");
+    expect(html).not.toContain("Failed");
+    expect(html).not.toContain("You missed the Goblin.");
+  });
+
+  it("renders partial attempts with the partial marker", () => {
+    const html = renderToStaticMarkup(<Ledger log={[partialAttempt()]} />);
+    expect(html).toContain("◐");
+    expect(html).toContain("· partial");
+    expect(html).not.toContain("Refused");
+  });
+
+  it("keeps refused claims loud with one short reason line", () => {
+    const html = renderToStaticMarkup(<Ledger log={[refusedClaim()]} />);
+    expect(html).toContain("Refused");
+    expect(html).toContain("There is no Legendary Sword here.");
+    expect(html).not.toContain("watches you closely");
+  });
+
+  it("collapses consecutive identical labels with a count", () => {
+    const html = renderToStaticMarkup(<Ledger log={[failedAttack(), failedAttack()]} />);
+    expect(html).toContain("Missed the Goblin ×2");
+    expect(html).not.toContain("3 vs 9+");
+  });
+
+  it("expands a row to its full reason behind a real button", () => {
+    const collapsed = renderToStaticMarkup(<Ledger log={[refusedClaim()]} />);
+    expect(collapsed).toContain("<button");
+    expect(collapsed).toContain('aria-expanded="false"');
+    expect(collapsed).not.toContain("watches you closely");
+    const expanded = renderToStaticMarkup(<Ledger log={[refusedClaim()]} defaultExpanded={true} />);
+    expect(expanded).toContain('aria-expanded="true"');
+    expect(expanded).toContain("The Crypt Warden watches you closely.");
+  });
+
+  it("shows Nothing yet. when the log is empty", () => {
+    const html = renderToStaticMarkup(<Ledger log={[]} />);
+    expect(html).toContain("Nothing yet.");
+    expect(html).not.toContain("No claims yet.");
+  });
+
+  it("still offers Show all with the entry count", () => {
+    const log: ToolLogEntry[] = [failedAttack(), failedAttack(), failedAttack(), failedAttack(), failedAttack(), failedAttack(), failedAttack()];
+    const html = renderToStaticMarkup(<Ledger log={log} />);
+    expect(html).toContain("Show all (7)");
   });
 });
 

@@ -15,7 +15,7 @@ Living document: we refine it as we build. Concept mockups: V3 "Kinetic fate" on
 3. **Never skew text.** Shapes behind text can angle; the text itself stays level and sharp.
 4. **Calm while reading, loud at key moments.** Narration sits in a quiet panel. Style explodes only for the big beats (see section 5).
 5. **One accent.** Violet marks what matters (main action, the dice result, the logo). Coral and mint are meaning colors, used only for their meaning.
-6. **Honest proof labels.** Show "Fate sealed" while secrets are hidden and "Fate verified" only after the proof is actually checked. Never show a green or mint "verified" state early.
+6. **Honest proof labels.** Show "Fate sealed" (with "Relic & trap locked" under it) while secrets are hidden and "Seal matches" (with "Fate verified" as a small caption) only after the proof is actually checked in the player's browser. Never show a green or mint "verified" state early, and never claim the whole game or the dice were fair — the seal covers only where the relic and the trap were hidden.
 7. **Original assets only.** Inspired by the games below, never copied: no logos, menus, characters, fonts, color schemes or screens from them. No Persona-style red-and-black.
 8. **Accessible.** Text contrast 4.5:1 or better, real `<button>`/`<input>`/`<label>` elements, touch targets 44px+, and every animation respects `prefers-reduced-motion`. Full-screen flashes are rare and soft.
 
@@ -31,7 +31,7 @@ Living document: we refine it as we build. Concept mockups: V3 "Kinetic fate" on
 | Accent: witchfire violet | `#B44DFF` | Logo, main button, dice result, thread of fate (10%) |
 | Accent tint | `#3A2848` / `#E8CCFF` | Tag fills / tag text on violet |
 | Danger: coral | `#FF6B5B` | Damage, hearts, REJECTED / REFUSED stamps, traps |
-| Verified: mint | `#4DE8B5` | Hits, success, checkmarks, FATE VERIFIED |
+| Verified: mint | `#4DE8B5` | Hits, success, checkmarks, SEAL MATCHES |
 | Line | `#5A4A68` | Outlines, empty hearts, dividers |
 
 ## 3. Typography
@@ -53,7 +53,7 @@ Narration 18–21px, line-height ~1.65, max ~66 characters per line. Mark the la
 - **Stamps:** outlined, uppercase Cinzel, rotated -4° to -12° (DEFEATED, REFUSED).
 - **Hearts** for HP (filled coral / outlined line color).
 - **Turns left** for the turn limit: a violet line that shortens, frayed at the end.
-- **Geometric seal** with a rune for "Fate sealed"; it cracks for "Fate verified".
+- **Geometric seal** with a rune for "Fate sealed"; it cracks for "Seal matches" (caption "Fate verified").
 - **Rune border** as a faint divider under the header.
 - **Action log:** the player-facing action log in plain words ("Claimed a Legendary Sword → REFUSED"). The raw tool calls live in the Inspector for judges.
 - **Suggestions** are titled "What you can do".
@@ -69,7 +69,7 @@ Narration 18–21px, line-height ~1.65, max ~66 characters per line. Mark the la
   - **Dice roll:** a quick spin, then the number lands big in a violet block with "NEEDED 10+ → HIT".
   - **Cheat rejected:** a coral REFUSED stamp lands across the attempted claim.
   - **Trap / big hit:** a short coral flash and a small screen shake.
-  - **Verify:** the seal cracks, then "FATE VERIFIED" in mint, with proof details behind a link.
+  - **Verify:** the seal cracks, then "SEAL MATCHES" in mint (caption "Fate verified"), with proof details behind a link.
 
 ## 6. Layout
 

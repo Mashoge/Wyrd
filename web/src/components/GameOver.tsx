@@ -88,12 +88,17 @@ export function GameOverView({ phase, reveal, browserHash, canonical, storedComm
               </div>
             )}
             {verified && (
-              <motion.div className="font-title slant" style={fateStyle("#4DE8B5")}
-                initial={reduced ? false : { opacity: 0, scale: 0.92 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: animDur(reduced, 200), ease: EASE as unknown as [number, number, number, number] }}>
-                Fate verified
-              </motion.div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
+                <motion.div className="font-title slant" style={fateStyle("#4DE8B5")}
+                  initial={reduced ? false : { opacity: 0, scale: 0.92 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: animDur(reduced, 200), ease: EASE as unknown as [number, number, number, number] }}>
+                  Seal matches
+                </motion.div>
+                <span style={{ fontFamily: "Inter,sans-serif", fontSize: 12, color: "#B9AEC0" }}>
+                  Fate verified
+                </span>
+              </div>
             )}
             {broken && (
               <motion.div className="font-title slant" style={fateStyle("#FF6B5B")}
@@ -103,11 +108,14 @@ export function GameOverView({ phase, reveal, browserHash, canonical, storedComm
                 Seal broken
               </motion.div>
             )}
-            {(verified || broken) && (
+            {verified && (
+              <div style={{ fontFamily: "Inter,sans-serif", fontSize: 14, lineHeight: 1.55, color: "#F4EFF6" }}>
+                Your browser checked the seal from turn one: the relic and the trap stayed exactly where they were hidden. The AI never moved them.
+              </div>
+            )}
+            {broken && (
               <div className="font-story" style={noteStyle}>
-                {verified
-                  ? "The relic and the trap never moved since turn one."
-                  : "The secrets do not match the seal from turn one."}
+                The secrets do not match the seal from turn one.
               </div>
             )}
           </div>

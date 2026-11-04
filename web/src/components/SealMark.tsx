@@ -18,7 +18,7 @@ export function SealMark({ phase, reduced }: { phase: GameOverPhase; reduced: bo
       height="72"
       viewBox="0 0 48 48"
       role="img"
-      aria-label={cracked ? "Seal, fate verified" : "Seal, fate sealed"}
+      aria-label={phase === "verified" ? "Seal matches" : phase === "broken" ? "Seal broken" : "Fate sealed"}
       className={pulsing ? "wyrd-pending-bar" : undefined}
       initial={false}
       animate={phase === "loading" ? { opacity: [1, 0.6, 1] } : cracked ? { x: [0, -2, 2, 0] } : { x: 0 }}

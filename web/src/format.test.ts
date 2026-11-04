@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DiceRoll, ToolLogEntry } from "./api";
-import { formatRoll, hasRelic, hearts, shortCommit, threadFraction, toolToPlain, turnsLeft } from "./format";
+import { collapseConsecutiveLabels, failedRollSummary, formatRoll, hasRelic, hearts, isPartialAttempt, shortCommit, shortRefusalReason, threadFraction, toolToPlain, turnsLeft } from "./format";
 
 function roll(partial: Partial<DiceRoll> & { purpose: string }): DiceRoll {
   return {
@@ -153,6 +153,48 @@ describe("toolToPlain", () => {
     );
     expect(enemyMiss.failed).toBe(false);
     expect(enemyMiss.label).toBe("Struck the Goblin");
+  });
+});
+
+describe("compact ledger formats", () => {
+  it("shortens refusal reasons to the first sentence, max ~40 chars", () => {
+    expect(shortRefusalReason("There is no exit to the north.")).toBe("There is no exit to the north.");
+    expect(shortRefusalReason("No door. The Crypt Warden blocks the way.")).toBe("No door.");
+    expect(shortRefusalReason(undefined)).toBe("It did not work.");
+    const long = shortRefusalReason("The Crypt Warden blocks the way with a massive stone slab door.");
+    expect(long.length).toBeLessThanOrEqual(40);
+    expect(long).toBe("The Crypt Warden blocks the way with a…");
+  });
+
+  it("summarizes the failed roll compactly and flags partials", () => {
+    expect(failedRollSummary([roll({ purpose: "player attack", value: 4, target: 9, success: false })])).toBe(
+      "4 vs 9+",
+    );
+    expect(
+      failedRollSummary([roll({ purpose: "enemy attack", value: 5, target: 12, success: false })]),
+    ).toBeNull();
+    expect(isPartialAttempt([roll({ purpose: "attempt", value: 7, target: 9, success: false, result: "partial" })])).toBe(
+      true,
+    );
+    expect(isPartialAttempt([roll({ purpose: "attempt", value: 2, target: 9, success: false, result: "fail" })])).toBe(
+      false,
+    );
+  });
+
+  it("collapses only consecutive identical labels", () => {
+    expect(
+      collapseConsecutiveLabels(["Missed the Crypt Warden", "Missed the Crypt Warden", "Struck the Goblin"]),
+    ).toEqual([
+      { label: "Missed the Crypt Warden", count: 2 },
+      { label: "Struck the Goblin", count: 1 },
+    ]);
+    expect(
+      collapseConsecutiveLabels(["Missed the Goblin", "Struck the Goblin", "Missed the Goblin"]),
+    ).toEqual([
+      { label: "Missed the Goblin", count: 1 },
+      { label: "Struck the Goblin", count: 1 },
+      { label: "Missed the Goblin", count: 1 },
+    ]);
   });
 });
 

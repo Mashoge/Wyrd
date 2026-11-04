@@ -11,6 +11,10 @@ import { GameOver } from "./components/GameOver";
 import { StoryFeed, createTurnId, type Turn } from "./components/StoryFeed";
 import { Suggestions } from "./components/Suggestions";
 import { BootScreen, type BootPhase } from "./components/BootScreen";
+import { TipQueue, detectTips, hasSeenIntro, type Tip } from "./guidance";
+import { IntroModal } from "./components/IntroModal";
+import { HelpPanel } from "./components/HelpPanel";
+import { TipCard } from "./components/TipCard";
 
 const INSPECTOR_STORAGE_KEY = "wyrd.inspector";
 
@@ -68,6 +72,16 @@ export function App(): JSX.Element {
   const [bootCommitment, setBootCommitment] = useState<string | null>(null);
   const [bootSlow, setBootSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [introOpen, setIntroOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [tipQueue] = useState<TipQueue>(() => new TipQueue());
+  const [currentTip, setCurrentTip] = useState<Tip | null>(null);
+  const [guidanceTick, setGuidanceTick] = useState(0);
+  // Guidance: tip entries accumulate across turns; only successful turns add.
+  const guidanceEntriesRef = useRef<ToolLogEntry[]>([]);
+  // True while the first-view intro is up, so tips do not pop in behind it.
+  const introSeenRef = useRef<boolean>(hasSeenIntro());
+  const [introEverClosed, setIntroEverClosed] = useState<boolean>(introSeenRef.current);
   const busyRef = useRef(false);
   const gameRef = useRef<LoadedGame | null>(null);
   const storyScrollRef = useRef<HTMLDivElement | null>(null);
@@ -93,6 +107,40 @@ export function App(): JSX.Element {
     },
     [],
   );
+
+  // First visit only: show the intro once the boot screen finishes.
+  useEffect(() => {
+    if (!booting && game !== null && !introSeenRef.current) setIntroOpen(true);
+  }, [booting, game]);
+
+  // Tip detection: runs when the game state changes (view / status / turns).
+  useEffect(() => {
+    if (game === null || booting || !introEverClosed) return;
+    tipQueue.offer(detectTips({ entries: guidanceEntriesRef.current, view: game.view, over: game.status !== "playing" }));
+    setCurrentTip(tipQueue.currentTip());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game, booting, introEverClosed, guidanceTick]);
+
+  const closeTip = useCallback((): void => {
+    tipQueue.closeCurrent();
+    setCurrentTip(tipQueue.currentTip());
+  }, [tipQueue]);
+
+  const closeIntro = useCallback((): void => {
+    introSeenRef.current = true;
+    setIntroOpen(false);
+    setIntroEverClosed(true);
+    // Then returns to the input.
+    if (typeof document !== "undefined") {
+      const el = document.getElementById("wyrd-action");
+      if (el !== null && typeof (el as HTMLInputElement).focus === "function") {
+        (el as HTMLInputElement).focus();
+      }
+    }
+  }, []);
+
+  const openHelp = useCallback((): void => setHelpOpen(true), []);
+  const closeHelp = useCallback((): void => setHelpOpen(false), []);
 
   const toggleInspector = useCallback((): void => {
     setInspectorOn((prev) => {
@@ -218,6 +266,8 @@ export function App(): JSX.Element {
     if (busyRef.current || current === null || current.status !== "playing") return;
     const clean = text.trim().slice(0, 500);
     if (clean.length === 0) return;
+    // A showing tip closes automatically after the player's next action.
+    if (tipQueue.currentId !== null) closeTip();
     busyRef.current = true;
     setBusy(true);
     const pendingId = createTurnId();
@@ -229,6 +279,8 @@ export function App(): JSX.Element {
     const gameId = current.gameId;
     try {
       const res = await playTurn(gameId, clean);
+      guidanceEntriesRef.current = [...guidanceEntriesRef.current, ...res.toolLog];
+      setGuidanceTick((t) => t + 1);
       // Replace by id: never duplicate the player line, placeholder becomes real narration.
       setTurns((prev) =>
         prev.map((t) =>
@@ -261,7 +313,7 @@ export function App(): JSX.Element {
       busyRef.current = false;
       setBusy(false);
     }
-  }, [applyGameData]);
+  }, [applyGameData, closeTip, tipQueue]);
 
   const retryTurn = useCallback(
     async (id: string, text: string): Promise<void> => {
@@ -309,6 +361,7 @@ export function App(): JSX.Element {
 
   return AppLayout({
     game, turns, ledger, suggestions, busy, inspectorOn, booting, bootPhase, bootFresh, bootCommitment, bootSlow, error, over, won, storyScrollRef, onStoryScroll: handleStoryScroll, sendAction, retryTurn, retryBoot: boot, newGame, markVerified, onToggleInspector: toggleInspector,
+    introOpen, helpOpen, currentTip, onCloseIntro: closeIntro, onOpenHelp: openHelp, onCloseHelp: closeHelp, onCloseTip: closeTip,
   });
 }
 
@@ -334,17 +387,24 @@ interface LayoutArgs {
   retryBoot: () => Promise<void>; markVerified: () => void;
   newGame: () => Promise<void>;
   onToggleInspector: () => void;
+  introOpen: boolean;
+  helpOpen: boolean;
+  currentTip: Tip | null;
+  onCloseIntro: () => void;
+  onOpenHelp: () => void;
+  onCloseHelp: () => void;
+  onCloseTip: () => void;
 }
 
 function AppLayout(args: LayoutArgs): JSX.Element {
-  const { game, turns, ledger, suggestions, busy, inspectorOn, booting, bootPhase, bootFresh, bootCommitment, bootSlow, error, over, won, storyScrollRef, onStoryScroll, sendAction, retryTurn, retryBoot, newGame, markVerified, onToggleInspector } = args;
+  const { game, turns, ledger, suggestions, busy, inspectorOn, booting, bootPhase, bootFresh, bootCommitment, bootSlow, error, over, won, storyScrollRef, onStoryScroll, sendAction, retryTurn, retryBoot, newGame, markVerified, onToggleInspector, introOpen, helpOpen, currentTip, onCloseIntro, onOpenHelp, onCloseHelp, onCloseTip } = args;
   const inspectorTurns: InspectorTurn[] = turns
     .filter((t) => !t.pending && !t.failed)
     .map((t) => ({ id: t.id, playerText: t.playerText, toolLog: t.toolLog, meta: t.meta ?? null }));
   return (
     <div className="wyrd-app">
       <div className="wyrd-app-inner">
-        {game !== null && <Header commitment={game.commitment} verified={game.verified} inspectorOn={inspectorOn} onToggleInspector={onToggleInspector} />}
+        {game !== null && <Header commitment={game.commitment} verified={game.verified} inspectorOn={inspectorOn} onToggleInspector={onToggleInspector} onOpenHelp={onOpenHelp} />}
         <div className="font-rune" aria-hidden="true" style={runeStyle}>
           ᚹ ᚣ ᚱ ᛞ ᛫ ᚠ ᚨ ᛏ ᛖ ᛫ ᚹ ᚣ ᚱ ᛞ ᛫ ᚠ ᚨ ᛏ ᛖ ᛫ ᚹ ᚣ ᚱ ᛞ
         </div>
@@ -390,10 +450,12 @@ function AppLayout(args: LayoutArgs): JSX.Element {
               </div>
               {!over && (
                 <div style={pinnedBarStyle}>
+                  <TipCard tip={currentTip} onClose={onCloseTip} />
                   <Suggestions suggestions={suggestions} disabled={busy} onPick={(t) => void sendAction(t)} view={game.view} />
                   <ActionForm disabled={busy} gameId={game.gameId} onSubmit={(t) => void sendAction(t)} />
                 </div>
               )}
+              {over && <TipCard tip={currentTip} onClose={onCloseTip} />}
             </main>
             <Sidebar view={game.view} status={game.status} ledger={ledger} map={game.map} />
             {inspectorOn && (
@@ -403,6 +465,8 @@ function AppLayout(args: LayoutArgs): JSX.Element {
             )}
           </div>
         )}
+        <IntroModal open={introOpen} onClose={onCloseIntro} />
+        <HelpPanel open={helpOpen} onClose={onCloseHelp} />
       </div>
     </div>
   );

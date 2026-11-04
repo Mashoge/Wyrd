@@ -46,6 +46,7 @@ describe("GameOver states", () => {
     const html = renderToStaticMarkup(<GameOverView {...viewProps("loading")} />);
     expect(html).toContain("Breaking the seal");
     expect(html).not.toContain("#4DE8B5");
+    expect(html).not.toContain("Seal matches");
     expect(html).not.toContain("Fate verified");
     expect(html).not.toContain("Seal broken");
   });
@@ -58,11 +59,15 @@ describe("GameOver states", () => {
     expect(html).not.toContain("#4DE8B5");
   });
 
-  it("verified shows mint Fate verified with facts", () => {
+  it("verified shows mint Seal matches with the plain proof text", () => {
     const html = renderToStaticMarkup(<GameOverView {...viewProps("verified")} />);
+    expect(html).toContain("Seal matches");
     expect(html).toContain("Fate verified");
     expect(html).toContain("#4DE8B5");
-    expect(html).toContain("The relic and the trap never moved since turn one.");
+    expect(html).toContain(
+      "Your browser checked the seal from turn one: the relic and the trap stayed exactly where they were hidden. The AI never moved them.",
+    );
+    expect(html).not.toContain("The relic and the trap never moved since turn one.");
     expect(html).toContain("Relic was in Library");
     expect(html).toContain("Trap was Hall, east");
     expect(html).toContain("You passed the Library twice.");
@@ -76,6 +81,7 @@ describe("GameOver states", () => {
     expect(html).toContain("#FF6B5B");
     expect(html).toContain("The secrets do not match the seal from turn one.");
     expect(html).not.toContain("#4DE8B5");
+    expect(html).not.toContain("Seal matches");
     expect(html).not.toContain("Fate verified");
   });
 
@@ -89,13 +95,23 @@ describe("GameOver states", () => {
 });
 
 describe("Header verify state", () => {
-  it("sealed by default, verified after success", () => {
+  it("sealed by default with Relic & trap locked, Seal matches after success", () => {
     const sealed = renderToStaticMarkup(<Header commitment="abcdef1234567890" verified={false} />);
     expect(sealed).toContain("Fate sealed");
+    expect(sealed).toContain("Relic &amp; trap locked");
+    expect(sealed).not.toContain("Seal matches");
     expect(sealed).not.toContain("#4DE8B5");
     const verified = renderToStaticMarkup(<Header commitment="abcdef1234567890" verified={true} />);
-    expect(verified).toContain("Fate verified");
+    expect(verified).toContain("Seal matches");
     expect(verified).toContain("#4DE8B5");
+    expect(verified).not.toContain("Relic &amp; trap locked");
+  });
+
+  it("renders a real How to play button", () => {
+    const html = renderToStaticMarkup(<Header commitment="abcdef1234567890" verified={false} onOpenHelp={noop} />);
+    expect(html).toContain("<button");
+    expect(html).toContain('aria-label="How to play"');
+    expect(html).toContain(">");
   });
 
   it("renders a real Inspector toggle button with aria-pressed", () => {

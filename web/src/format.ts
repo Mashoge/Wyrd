@@ -58,6 +58,58 @@ export interface PlainToolCall {
   detail: string;
 }
 
+/** First sentence of a refusal reason, capped at ~40 chars for the compact log. */
+export function shortRefusalReason(reason: string | undefined): string {
+  const full = (reason ?? "").trim();
+  if (full.length === 0) return "It did not work.";
+  const match = full.match(/^[^.!?]+[.!?]?/);
+  let first = (match !== null ? match[0] : full).trim();
+  if (first.length === 0) first = full;
+  if (first.length <= 40) return first;
+  return `${first.slice(0, 39).trimEnd()}…`;
+}
+
+/** Compact "4 vs 9+" for the first failed player roll, or null when none. */
+export function failedRollSummary(rolls: DiceRoll[]): string | null {
+  for (const r of rolls) {
+    const purpose = r.purpose.trim().toLowerCase();
+    const isPlayerFail =
+      !r.success &&
+      (purpose === "player attack" ||
+        purpose === "sneak" ||
+        purpose === "grab" ||
+        (purpose === "attempt" && r.result !== "success"));
+    if (!isPlayerFail) continue;
+    if (r.target > 0) return `${r.value} vs ${r.target}+`;
+    return `${r.value}`;
+  }
+  return null;
+}
+
+/** True when the entry holds a partial attempt roll. */
+export function isPartialAttempt(rolls: DiceRoll[]): boolean {
+  return rolls.some((r) => r.purpose.trim().toLowerCase() === "attempt" && r.result === "partial");
+}
+
+export interface CollapsedLabel {
+  label: string;
+  count: number;
+}
+
+/** Collapse consecutive identical labels, preserving order. */
+export function collapseConsecutiveLabels(labels: string[]): CollapsedLabel[] {
+  const out: CollapsedLabel[] = [];
+  for (const label of labels) {
+    const last = out[out.length - 1];
+    if (last !== undefined && last.label === label) {
+      last.count += 1;
+    } else {
+      out.push({ label, count: 1 });
+    }
+  }
+  return out;
+}
+
 function argText(args: Record<string, unknown>, key: string): string | null {
   const v: unknown = args[key];
   return typeof v === "string" && v.trim().length > 0 ? v : null;
