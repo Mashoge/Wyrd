@@ -8,6 +8,8 @@ function titleCasePurpose(purpose: string): string {
     grab: "Grab roll",
     "player damage": "Damage",
     trap: "Trap",
+    attempt: "Attempt roll",
+    "attempt damage": "Attempt damage",
   };
   const lowered = purpose.trim().toLowerCase();
   if (lowered in map) return map[lowered] as string;
@@ -26,19 +28,24 @@ export function formatRoll(roll: DiceRoll): string {
   if (lower === "trap") {
     return `${label} ${roll.value} damage`;
   }
+  if (lower === "attempt damage") {
+    return `${label} ${roll.value}`;
+  }
   if (roll.target > 0) {
     const outcome =
-      lower === "player attack"
-        ? roll.success
-          ? "hit"
-          : "miss"
-        : lower === "enemy attack"
+      lower === "attempt" && roll.result !== undefined
+        ? roll.result
+        : lower === "player attack"
           ? roll.success
-            ? "it hits you"
-            : "it misses"
-          : roll.success
-            ? "success"
-            : "fail";
+            ? "hit"
+            : "miss"
+          : lower === "enemy attack"
+            ? roll.success
+              ? "it hits you"
+              : "it misses"
+            : roll.success
+              ? "success"
+              : "fail";
     return `${label} ${roll.value} · needed ${roll.target}+ → ${outcome}`;
   }
   return `${label} ${roll.value}`;
@@ -68,6 +75,7 @@ function hasFailedPlayerRoll(rolls: DiceRoll[]): boolean {
     const purpose = r.purpose.trim().toLowerCase();
     if (r.success) continue;
     if (purpose === "player attack" || purpose === "sneak" || purpose === "grab") return true;
+    if (purpose === "attempt" && r.result !== "success") return true;
   }
   return false;
 }

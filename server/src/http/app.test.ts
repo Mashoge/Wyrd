@@ -425,7 +425,7 @@ describe("reveal after forced loss", () => {
     expect(res.body.verified).toBe(true);
     expect(verifyCommit(st.secrets, res.body.salt as string, res.body.commitment as string)).toBe(true);
     expect(typeof res.body.nearMiss === "string" || res.body.nearMiss === null).toBe(true);
-    expect(res.body.rulesVersion).toBe("wyrd-rules-v2");
+    expect(res.body.rulesVersion).toBe("wyrd-rules-v3");
     expect(res.body.tip).toBe(
       "Pick up several things in one go: 'grab the key and the coin'.",
     );

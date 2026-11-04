@@ -193,6 +193,18 @@ export function validateWorld(world: World): string[] {
         errors.push(`Enemy "${enemyKey}" has unknown loot item "${lootId}".`);
       }
     }
+    if (enemy.attemptModifiers !== undefined) {
+      const validApproaches = ["force", "finesse", "wits", "charm"];
+      for (const [approach, value] of Object.entries(enemy.attemptModifiers)) {
+        if (!validApproaches.includes(approach)) {
+          errors.push(`Enemy "${enemyKey}" has unknown attempt approach "${approach}".`);
+        } else if (!Number.isInteger(value) || value < -10 || value > 10) {
+          errors.push(
+            `Enemy "${enemyKey}" has invalid attemptModifiers.${approach} ${value}: must be an integer between -10 and 10.`,
+          );
+        }
+      }
+    }
     if (enemy.loot.includes(world.relicItemId)) {
       errors.push(
         `Relic item "${world.relicItemId}" must not appear in enemy "${enemyKey}" loot.`,

@@ -312,3 +312,19 @@ describe("validateWorld", () => {
     expect(validateWorld(w).some((e) => e.includes("omen"))).toBe(true);
   });
 });
+
+  it("rejects invalid attemptModifiers (non-integer, out of range, unknown approach)", () => {
+    const w1 = clone();
+    w1.enemies["goblin"]!.attemptModifiers = { charm: 1.5 };
+    expect(validateWorld(w1).some((e) => e.includes("attemptModifiers.charm"))).toBe(true);
+    const w2 = clone();
+    w2.enemies["goblin"]!.attemptModifiers = { charm: 11 };
+    expect(validateWorld(w2).some((e) => e.includes("attemptModifiers.charm"))).toBe(true);
+    const w3 = clone();
+    w3.enemies["goblin"]!.attemptModifiers = { luck: 1 } as never;
+    expect(validateWorld(w3).some((e) => e.includes("unknown attempt approach"))).toBe(true);
+    const w4 = clone();
+    w4.enemies["goblin"]!.attemptModifiers = { charm: -10, force: 10 };
+    expect(validateWorld(w4).some((e) => e.includes("attemptModifiers"))).toBe(false);
+  });
+

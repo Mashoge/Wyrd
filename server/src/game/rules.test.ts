@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createGameState } from "./state.js";
-import { attack, endTurn, examine, move, pickUp, sneak, throwItem, useItem } from "./rules.js";
+import { attempt, attack, endTurn, examine, move, pickUp, sneak, throwItem, useItem } from "./rules.js";
 import type { GameState, Rng, World } from "./types.js";
 
 function seqRng(values: number[]): Rng {
@@ -1154,4 +1154,214 @@ describe("trap", () => {
 
 
 
+
+
+describe("attempt", () => {
+  // d20 from rng x: 1 + floor(x * 20). Base target 12.
+  const roll20 = (value: number): number => (value - 0.5) / 20;
+
+  it("pins targets: modified 9 (charm -3), 16 (charm +4), base 12 unmodified", () => {
+    const world = makeWorld();
+    world.enemies["goblin"]!.attemptModifiers = { charm: -3 };
+    const state = makeState(world);
+    const r1 = attempt(state, world, "goblin", "charm", "harm", "sing", seqRng([roll20(9), 0, 0]));
+    expect(r1.rolls[0]).toMatchObject({ purpose: "attempt", value: 9, target: 9, success: true, result: "success" });
+
+    const world3 = makeWorld();
+    world3.enemies["goblin"]!.attemptModifiers = { charm: 4 };
+    const state3 = makeState(world3);
+    const r3 = attempt(state3, world3, "goblin", "charm", "harm", "plead", seqRng([roll20(15), 0, roll20(1)]));
+    expect(r3.rolls[0]).toMatchObject({ target: 16, success: false, result: "partial" });
+
+    const world4 = makeWorld();
+    const state4 = makeState(world4);
+    const r4 = attempt(state4, world4, "goblin", "force", "harm", "shove", seqRng([roll20(12), 0, 0]));
+    expect(r4.rolls[0]).toMatchObject({ target: 12, result: "success" });
+  });
+
+  it("pins sunkenCrypt modifiers: goblin charm 9, bone troll wits 9, warden charm 16", async () => {
+    const { sunkenCrypt } = await import("./worlds/sunkenCrypt.js");
+    const mk = (roomId: string, enemyId: string, approach: "charm" | "wits") => {
+      const w: World = structuredClone(sunkenCrypt);
+      const s = makeState(w);
+      s.currentRoomId = roomId;
+      s.enemies[enemyId]!.hp = 50;
+      return attempt(s, w, enemyId, approach, "distract", "try", seqRng([roll20(20)]));
+    };
+    expect(mk("goblin_den", "goblin", "charm").rolls[0]?.target).toBe(9);
+    expect(mk("gate_hall", "bone_troll", "wits").rolls[0]?.target).toBe(9);
+    expect(mk("ossuary", "crypt_warden", "charm").rolls[0]?.target).toBe(16);
+  });
+
+  it("success/partial/fail bands for harm; partial and fail counterattack", () => {
+    const world = makeWorld();
+    const s1 = makeState(world);
+    const ok = attempt(s1, world, "goblin", "force", "harm", "lunge", seqRng([roll20(20), 0.99]));
+    expect(ok.rolls.map((r) => r.purpose)).toEqual(["attempt", "attempt damage"]);
+    expect(ok.rolls[1]).toMatchObject({ sides: 4, value: 4 });
+    expect(s1.enemies["goblin"]!.hp).toBe(1);
+    expect(s1.hp).toBe(10);
+    expect(s1.turn).toBe(1);
+
+    const s2 = makeState(world);
+    const part = attempt(s2, world, "goblin", "force", "harm", "lunge", seqRng([roll20(10), 0, roll20(15)]));
+    expect(part.rolls[0]).toMatchObject({ result: "partial", success: false });
+    expect(s2.enemies["goblin"]!.hp).toBe(4);
+    expect(s2.hp).toBe(8);
+    expect(part.rolls.map((r) => r.purpose)).toEqual(["attempt", "attempt damage", "enemy attack"]);
+
+    const s3 = makeState(world);
+    const fail = attempt(s3, world, "goblin", "force", "harm", "lunge", seqRng([roll20(1), roll20(15)]));
+    expect(fail.rolls[0]).toMatchObject({ result: "fail", success: false });
+    expect(s3.enemies["goblin"]!.hp).toBe(5);
+    expect(s3.hp).toBe(8);
+    expect(s3.turn).toBe(1);
+  });
+
+  it("harm kill drops loot like attack and prevents counterattack", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.enemies["goblin"]!.hp = 3;
+    const result = attempt(state, world, "goblin", "force", "harm", "smash", seqRng([roll20(20), 0.99]));
+    expect(state.enemies["goblin"]!.defeated).toBe(true);
+    expect(state.rooms["entrance"]!.items).toContain("coin");
+    expect(result.events.some((e) => e.includes("dropped"))).toBe(true);
+    expect(result.rolls.map((r) => r.purpose)).toEqual(["attempt", "attempt damage"]);
+    expect(state.hp).toBe(10);
+  });
+
+
+  it("pass sets sneaked and unblocks move; distract enables sneak's 9 target", () => {
+    const world = makeWorld();
+    const s1 = makeState(world);
+    const r = attempt(s1, world, "north", "finesse", "pass", "roll past", seqRng([roll20(12)]));
+    expect(r.ok).toBe(true);
+    expect(s1.flags["sneaked:entrance"]).toBe(true);
+    expect(move(s1, world, "north", seqRng([])).ok).toBe(true);
+    expect(s1.currentRoomId).toBe("hallway");
+
+    const s2 = makeState(world);
+    expect(attempt(s2, world, "goblin", "wits", "distract", "juggle", seqRng([roll20(12)])).ok).toBe(true);
+    expect(s2.flags["distracted:entrance:goblin"]).toBe(true);
+    const sn = sneak(s2, world, "goblin", seqRng([roll20(9)]));
+    expect(sn.rolls[0]).toMatchObject({ target: 9, success: true });
+  });
+
+  it("partial learn with no enemy still spends the turn, no counterattack", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.currentRoomId = "hallway";
+    state.secrets.trap = { roomId: "hallway", direction: "north" };
+    const r = attempt(state, world, "north", "wits", "learn", "inspect", seqRng([roll20(10)]));
+    expect(r.rolls[0]).toMatchObject({ result: "partial" });
+    expect(r.events).toContain("The north exit is dangerous.");
+    expect(state.turn).toBe(1);
+    expect(state.hp).toBe(10);
+  });
+
+  it("repetition adds +2 per prior attempt, per enemy+approach", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.enemies["goblin"]!.hp = 50;
+    expect(attempt(state, world, "goblin", "force", "harm", "x", seqRng([roll20(1), roll20(1)])).rolls[0]?.target).toBe(12);
+    expect(attempt(state, world, "goblin", "force", "harm", "x", seqRng([roll20(1), roll20(1)])).rolls[0]?.target).toBe(14);
+    expect(attempt(state, world, "goblin", "force", "harm", "x", seqRng([roll20(1), roll20(1)])).rolls[0]?.target).toBe(16);
+    expect(state.flags["attempted:goblin:force:3"]).toBe(true);
+    expect(attempt(state, world, "goblin", "wits", "harm", "x", seqRng([roll20(1), roll20(1)])).rolls[0]?.target).toBe(12);
+  });
+
+  it("rejects invalid combos with state deep-equal and no turn cost", () => {
+    const world = makeWorld();
+    const cases: Array<[string, "harm" | "pass" | "distract" | "learn", string]> = [
+      ["goblin", "learn", "entrance"],
+      ["nowhere", "harm", "entrance"],
+      ["up", "learn", "hallway"],
+      ["north", "harm", "hallway"],
+      ["goblin", "harm", "hallway"],
+      ["room", "harm", "entrance"],
+      ["room", "distract", "entrance"],
+      ["east", "distract", "entrance"],
+      ["up", "pass", "entrance"],
+    ];
+    for (const [target, intent, roomId] of cases) {
+      const state = makeState(world);
+      state.currentRoomId = roomId;
+      const before = snapshot(state);
+      expect(attempt(state, world, target, "wits", intent, "x", seqRng([])).ok).toBe(false);
+      expect(state).toEqual(before);
+    }
+    const dead = makeState(world);
+    dead.enemies["goblin"]!.defeated = true;
+    const beforeDead = snapshot(dead);
+    expect(attempt(dead, world, "goblin", "force", "harm", "x", seqRng([])).ok).toBe(false);
+    expect(dead).toEqual(beforeDead);
+    const over = makeState(world);
+    over.status = "lost";
+    const beforeOver = snapshot(over);
+    expect(attempt(over, world, "goblin", "force", "harm", "x", seqRng([])).ok).toBe(false);
+    expect(over).toEqual(beforeOver);
+    const past = makeState(world);
+    past.flags["sneaked:entrance"] = true;
+    const beforePast = snapshot(past);
+    expect(attempt(past, world, "goblin", "finesse", "pass", "x", seqRng([])).ok).toBe(false);
+    expect(past).toEqual(beforePast);
+  });
+
+
+  it("learn hint truth property: matches secrets.trap exactly, never leaks relic", () => {
+    const directions = ["north", "east", "south", "west"];
+    for (const trapRoom of ["entrance", "hallway"]) {
+      for (const trapDir of directions) {
+        for (const askDir of directions) {
+          const world = makeWorld();
+          const room = world.rooms[trapRoom]!;
+          if (!room.exits.some((e) => e.direction === askDir)) continue;
+          const state = makeState(world);
+          state.currentRoomId = trapRoom;
+          state.secrets = { relicRoomId: "treasure", trap: { roomId: trapRoom, direction: trapDir } };
+          const r = attempt(state, world, askDir, "wits", "learn", "look", seqRng([roll20(20)]));
+          expect(r.ok).toBe(true);
+          const expected = askDir === trapDir ? `The ${askDir} exit is dangerous.` : `Nothing dangerous lies ${askDir}.`;
+          expect(r.events).toContain(expected);
+          expect(r.events.join(" ")).not.toContain("treasure");
+          expect(r.events.join(" ").toLowerCase()).not.toContain("relic");
+        }
+      }
+    }
+  });
+
+  it("learn on room: omen verbatim; else ONE exit only — first unvisited, else first", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.secrets.trap = { roomId: "entrance", direction: "east" };
+    const r = attempt(state, world, "room", "wits", "learn", "study", seqRng([roll20(20)]));
+    expect(r.events).toEqual(["Nothing dangerous lies north."]);
+
+    const s2 = makeState(world);
+    s2.secrets.trap = { roomId: "entrance", direction: "east" };
+    s2.visitedRoomIds.push("hallway");
+    expect(attempt(s2, world, "room", "wits", "learn", "study", seqRng([roll20(20)])).events)
+      .toEqual(["The east exit is dangerous."]);
+
+    const s3 = makeState(world);
+    s3.secrets.trap = { roomId: "entrance", direction: "east" };
+    s3.visitedRoomIds.push("hallway", "vault");
+    expect(attempt(s3, world, "room", "wits", "learn", "study", seqRng([roll20(20)])).events)
+      .toEqual(["Nothing dangerous lies north."]);
+
+    const world4 = makeWorld();
+    world4.rooms["entrance"]!.exits[1]!.omen = "Cold air seeps from the east.";
+    const s4 = makeState(world4);
+    s4.secrets.trap = { roomId: "entrance", direction: "east" };
+    expect(attempt(s4, world4, "room", "wits", "learn", "study", seqRng([roll20(20)])).events)
+      .toEqual(["Cold air seeps from the east."]);
+
+    // Fail band gives no hint at all.
+    const s5 = makeState(world);
+    s5.secrets.trap = { roomId: "entrance", direction: "east" };
+    const r5 = attempt(s5, world, "room", "wits", "learn", "study", seqRng([roll20(1), roll20(1)]));
+    expect(r5.rolls[0]).toMatchObject({ result: "fail" });
+    expect(r5.events.join(" ")).not.toContain("dangerous");
+  });
+});
 

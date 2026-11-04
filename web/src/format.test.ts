@@ -51,6 +51,32 @@ describe("formatRoll", () => {
     );
     expect(formatRoll(roll({ purpose: "trap", value: 3, target: 0 }))).toBe("Trap 3 damage");
   });
+
+  it("formats attempt rolls with success/partial/fail and attempt damage", () => {
+    expect(formatRoll(roll({ purpose: "attempt", value: 15, target: 13, success: true, result: "success" }))).toBe(
+      "Attempt roll 15 · needed 13+ → success",
+    );
+    expect(formatRoll(roll({ purpose: "attempt", value: 11, target: 13, success: false, result: "partial" }))).toBe(
+      "Attempt roll 11 · needed 13+ → partial",
+    );
+    expect(formatRoll(roll({ purpose: "attempt", value: 2, target: 13, success: false, result: "fail" }))).toBe(
+      "Attempt roll 2 · needed 13+ → fail",
+    );
+    expect(formatRoll(roll({ purpose: "attempt damage", value: 3, target: 0 }))).toBe("Attempt damage 3");
+  });
+
+  it("marks partial/failed attempts as failed in the action log", () => {
+    const partial = toolToPlain(
+      entryWithRolls(
+        "attempt",
+        { target: "goblin" },
+        [roll({ purpose: "attempt", value: 11, target: 13, success: false, result: "partial" })],
+        ["The Goblin is distracted."],
+      ),
+    );
+    expect(partial.accepted).toBe(true);
+    expect(partial.failed).toBe(true);
+  });
 });
 
 describe("toolToPlain", () => {

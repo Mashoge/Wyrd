@@ -2,6 +2,7 @@ export type GameStatus = "playing" | "won" | "lost";
 export interface DiceRoll {
   purpose: string; sides: number; value: number;
   target: number; success: boolean; bonus: number;
+  result?: "success" | "partial" | "fail";
 }
 export interface ToolResult {
   ok: boolean; action: string; reason?: string;

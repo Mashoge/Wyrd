@@ -371,6 +371,13 @@ describe("GAME_MASTER_PROMPT playtest rules", () => {
     );
   });
 
+  it("locks the attempt-tool guidance", () => {
+    expect(GAME_MASTER_PROMPT).toContain("Use the attempt tool only when the player's creative idea matches no other tool");
+    expect(GAME_MASTER_PROMPT).toContain("never describe an attempt's result before the tool returns its events");
+    expect(GAME_MASTER_PROMPT).toContain("narrate the player's own described action vividly in their words");
+    expect(GAME_MASTER_PROMPT).toContain("never invent a difficulty or an outcome");
+  });
+
   it("locks the action-sequence rule", () => {
     expect(GAME_MASTER_PROMPT).toContain("perform up to 3 actions in order, one tool call each");
     expect(GAME_MASTER_PROMPT).toContain("Stop at the first action that fails");
@@ -412,6 +419,21 @@ describe("cli roll + reveal formatting", () => {
     );
     expect(formatRoll({ purpose: "trap", sides: 4, value: 3, target: 0, success: true, bonus: 0 })).toBe(
       "🎲 Trap: 3 damage",
+    );
+  });
+
+  it("formats attempt rolls with success/partial/fail and attempt damage", () => {
+    expect(
+      formatRoll({ purpose: "attempt", sides: 20, value: 15, target: 13, success: true, bonus: 0, result: "success" }),
+    ).toBe("🎲 Attempt roll: 15 (needed 13+) → success");
+    expect(
+      formatRoll({ purpose: "attempt", sides: 20, value: 11, target: 13, success: false, bonus: 0, result: "partial" }),
+    ).toBe("🎲 Attempt roll: 11 (needed 13+) → partial");
+    expect(
+      formatRoll({ purpose: "attempt", sides: 20, value: 2, target: 13, success: false, bonus: 0, result: "fail" }),
+    ).toBe("🎲 Attempt roll: 2 (needed 13+) → fail");
+    expect(formatRoll({ purpose: "attempt damage", sides: 4, value: 3, target: 0, success: true, bonus: 0 })).toBe(
+      "🎲 Attempt damage: 3",
     );
   });
 

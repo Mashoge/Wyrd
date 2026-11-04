@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attack, examine, move, pickUp, sneak, throwItem, useItem } from "../game/rules.js";
+import { attempt, attack, examine, move, pickUp, sneak, throwItem, useItem } from "../game/rules.js";
 import { startGame } from "../game/state.js";
 import type { GameState, Rng, World } from "../game/types.js";
 import { sunkenCrypt } from "../game/worlds/sunkenCrypt.js";
@@ -24,9 +24,13 @@ function snapshot(state: GameState): GameState {
 }
 
 describe("TOOL_DEFINITIONS", () => {
-  it("exposes eight tools with plain string params and no endTurn", () => {
+  it("exposes nine tools with plain string params and no endTurn", () => {
     const names = TOOL_DEFINITIONS.map((t) => t.function.name).sort();
-    expect(names).toEqual(["attack", "examine", "look", "move", "pick_up", "sneak", "throw", "use_item"]);
+    expect(names).toEqual(["attack", "attempt", "examine", "look", "move", "pick_up", "sneak", "throw", "use_item"]);
+    const attemptDef = TOOL_DEFINITIONS.find((t) => t.function.name === "attempt");
+    expect(attemptDef?.function.parameters.required).toEqual(["target", "approach", "intent", "description"]);
+    expect(attemptDef?.function.parameters.additionalProperties).toBe(false);
+    expect(attemptDef?.function.description).toContain("no other tool covers");
     const attackDef = TOOL_DEFINITIONS.find((t) => t.function.name === "attack");
     expect(attackDef?.function.parameters.required).toEqual(["enemy_id"]);
     expect(Object.keys(attackDef?.function.parameters.properties ?? {})).toContain("weapon_id");
@@ -227,6 +231,56 @@ describe("executeTool arg validation and look", () => {
     expect(result.events[0]).toContain("Crypt Entrance");
     expect(state).toEqual(before);
     expect(state.turn).toBe(before.turn);
+  });
+});
+
+
+describe("executeTool attempt", () => {
+  it("dispatches to rules.attempt exactly", () => {
+    const { state, world } = freshGame();
+    state.currentRoomId = "goblin_den";
+    const direct = structuredClone(state);
+    const expected = attempt(direct, world, "goblin", "charm", "distract", "flatter it", seqRng([0.99]));
+    const result = executeTool(
+      state, world, "attempt",
+      '{"target":"goblin","approach":"charm","intent":"distract","description":"flatter it"}',
+      seqRng([0.99]),
+    );
+    expect(result).toEqual(expected);
+    expect(result.rolls[0]).toMatchObject({ purpose: "attempt", target: 9, result: "success" });
+    expect(state.flags["distracted:goblin_den:goblin"]).toBe(true);
+  });
+
+  it("ignores injected difficulty/outcome/extra args — target is engine-computed", () => {
+    const { state, world } = freshGame();
+    state.currentRoomId = "goblin_den";
+    const result = executeTool(
+      state, world, "attempt",
+      '{"target":"goblin","approach":"charm","intent":"distract","description":"x","difficulty":1,"outcome":"success","target_number":1}',
+      seqRng([0.99]),
+    );
+    expect(result.ok).toBe(true);
+    expect(result.rolls[0]?.target).toBe(9);
+  });
+
+  it("rejects malformed attempt args without state change", () => {
+    const { state, world } = freshGame();
+    state.currentRoomId = "goblin_den";
+    const raws = [
+      "{}",
+      '{"target":"goblin","approach":"luck","intent":"distract","description":"x"}',
+      '{"target":"goblin","approach":"charm","intent":"kill","description":"x"}',
+      '{"target":"goblin","approach":"charm","intent":"distract"}',
+      '{"target":7,"approach":"charm","intent":"distract","description":"x"}',
+      '{"target":"goblin","approach":"charm","intent":"distract","description":"  "}',
+    ];
+    for (const raw of raws) {
+      const before = snapshot(state);
+      const bad = executeTool(state, world, "attempt", raw, seqRng([]));
+      expect(bad.ok).toBe(false);
+      expect(bad.reason).toMatch(/Invalid arguments/);
+      expect(state).toEqual(before);
+    }
   });
 });
 

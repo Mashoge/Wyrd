@@ -19,6 +19,10 @@ export interface Exit {
   omen?: string;
 }
 
+export type AttemptApproach = "force" | "finesse" | "wits" | "charm";
+
+export type AttemptIntent = "harm" | "pass" | "distract" | "learn";
+
 export interface Enemy {
   id: string;
   name: string;
@@ -29,6 +33,8 @@ export interface Enemy {
   blocksRetreat: boolean;
   alertness: number;
   quirk: string;
+  /** Difficulty modifier per attempt approach: added to the target (negative = easier). */
+  attemptModifiers?: Partial<Record<AttemptApproach, number>>;
   /** Server-only secret: item that lures this enemy away when thrown. Never expose to player/AI. */
   lureItemId?: string;
 }
@@ -95,6 +101,8 @@ export interface DiceRoll {
   target: number;
   success: boolean;
   bonus: number;
+  /** Three-band outcome for attempt rolls; `success` is true only on "success". */
+  result?: "success" | "partial" | "fail";
 }
 
 export interface ToolResult {

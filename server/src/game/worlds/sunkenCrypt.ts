@@ -155,6 +155,7 @@ export const sunkenCrypt: World = {
       blocksRetreat: true,
       alertness: 20,
       quirk: "recites the names of the dead and hates being interrupted",
+      attemptModifiers: { charm: 4 },
     },
     goblin: {
       id: "goblin",
@@ -167,6 +168,7 @@ export const sunkenCrypt: World = {
       alertness: 8,
       quirk: "keeps counting its coins and losing track",
       lureItemId: "silver_coin",
+      attemptModifiers: { charm: -3 },
     },
     bone_troll: {
       id: "bone_troll",
@@ -179,6 +181,7 @@ export const sunkenCrypt: World = {
       alertness: 0,
       quirk: "stares at its own reflection in a puddle",
       lureItemId: "thigh_bone",
+      attemptModifiers: { wits: -3 },
     },
   },
 };

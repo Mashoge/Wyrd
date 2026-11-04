@@ -1,5 +1,9 @@
 import type { GameState, Rng, ToolResult, World } from "../game/types.js";
-import { attack, examine, move, pickUp, sneak, throwItem, useItem } from "../game/rules.js";
+import { attempt, attack, examine, move, pickUp, sneak, throwItem, useItem } from "../game/rules.js";
+import type { AttemptApproach, AttemptIntent } from "../game/types.js";
+
+const ATTEMPT_APPROACHES: readonly AttemptApproach[] = ["force", "finesse", "wits", "charm"];
+const ATTEMPT_INTENTS: readonly AttemptIntent[] = ["harm", "pass", "distract", "learn"];
 import { playerView } from "./view.js";
 
 export interface ToolFunctionParameter {
@@ -95,9 +99,20 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     { item_id: { type: "string", description: "ID of the item to examine." } },
     ["item_id"],
   ),
+  def(
+    "attempt",
+    "Try a creative action that no other tool covers (improvised stunts, tricks, sweet-talking, searching for hidden danger). The game engine alone sets the difficulty and judges success; you cannot choose them. harm/pass/distract need the living enemy in this room as target (pass may instead name an exit direction that enemy blocks); learn targets an exit direction or 'room'. Always costs a turn when accepted.",
+    {
+      target: { type: "string", description: "Enemy ID, exit direction, or 'room' (learn only)." },
+      approach: { type: "string", description: "One of: force, finesse, wits, charm." },
+      intent: { type: "string", description: "One of: harm, pass, distract, learn." },
+      description: { type: "string", description: "The player's own action in their words, for narration." },
+    },
+    ["target", "approach", "intent", "description"],
+  ),
 ];
 
-const KNOWN_TOOLS = new Set(["move", "pick_up", "use_item", "attack", "sneak", "look", "examine", "throw"]);
+const KNOWN_TOOLS = new Set(["move", "pick_up", "use_item", "attack", "sneak", "look", "examine", "throw", "attempt"]);
 
 function invalidArgs(action: string, reason: string): ToolResult {
   return { ok: false, action, reason, rolls: [], events: [] };
@@ -218,6 +233,29 @@ export function executeTool(
         return invalidArgs(name, 'Invalid arguments: "item_id" must be a non-empty string.');
       }
       return examine(state, world, itemId);
+    }
+    case "attempt": {
+      // Only the four schema fields are read; extra keys (difficulty, outcome…)
+      // are never looked at, so the engine alone computes the target.
+      const target = getStringArg(args, "target");
+      if (target === null) {
+        return invalidArgs(name, 'Invalid arguments: "target" must be a non-empty string.');
+      }
+      const approachRaw = getStringArg(args, "approach");
+      const approach = ATTEMPT_APPROACHES.find((a) => a === approachRaw);
+      if (approach === undefined) {
+        return invalidArgs(name, 'Invalid arguments: "approach" must be one of force, finesse, wits, charm.');
+      }
+      const intentRaw = getStringArg(args, "intent");
+      const intent = ATTEMPT_INTENTS.find((i) => i === intentRaw);
+      if (intent === undefined) {
+        return invalidArgs(name, 'Invalid arguments: "intent" must be one of harm, pass, distract, learn.');
+      }
+      const descriptionRaw = getStringArg(args, "description");
+      if (descriptionRaw === null) {
+        return invalidArgs(name, 'Invalid arguments: "description" must be a non-empty string.');
+      }
+      return attempt(state, world, target, approach, intent, descriptionRaw.trim().slice(0, 200), rng);
     }
     default: {
       return { ok: false, action: name, reason: `Unknown action ${name}.`, rolls: [], events: [] };

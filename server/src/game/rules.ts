@@ -1,5 +1,14 @@
 import { rollDie } from "./dice.js";
-import type { Enemy, GameState, Item, Rng, ToolResult, World } from "./types.js";
+import type {
+  AttemptApproach,
+  AttemptIntent,
+  Enemy,
+  GameState,
+  Item,
+  Rng,
+  ToolResult,
+  World,
+} from "./types.js";
 
 function gameOverResult(action: string): ToolResult {
   return { ok: false, action, reason: "The game is over.", rolls: [], events: [] };
@@ -384,6 +393,159 @@ export function sneak(
   }
   events.push(...endTurn(state, world));
   return { ok: true, action: "sneak", rolls, events };
+}
+
+function priorAttempts(state: GameState, enemyId: string, approach: AttemptApproach): number {
+  let n = 0;
+  while (state.flags[`attempted:${enemyId}:${approach}:${n + 1}`] === true) {
+    n += 1;
+  }
+  return n;
+}
+
+function trapHint(state: GameState, roomId: string, direction: string): string {
+  const isTrap =
+    state.secrets.trap.roomId === roomId &&
+    normalizeDirection(state.secrets.trap.direction) === direction;
+  return isTrap ? `The ${direction} exit is dangerous.` : `Nothing dangerous lies ${direction}.`;
+}
+
+/**
+ * Judged creative action. The engine alone fixes the target:
+ * 12 + enemy approach modifier (negative = easier) + 2 per prior attempt
+ * with the same approach against the same enemy.
+ * Bands: >= target success; target-3..target-1 partial (effect applies but a
+ * living enemy counterattacks); below fail (no effect, counterattack).
+ * `description` is the player's own words for narration only; never judged.
+ */
+export function attempt(
+  state: GameState,
+  world: World,
+  target: string,
+  approach: AttemptApproach,
+  intent: AttemptIntent,
+  description: string,
+  rng: Rng,
+): ToolResult {
+  void description;
+  if (state.status !== "playing") {
+    return gameOverResult("attempt");
+  }
+  const room = state.rooms[state.currentRoomId];
+  if (room === undefined) {
+    return reject("attempt", "You are nowhere.");
+  }
+  const normalized = target.trim().toLowerCase();
+  const roomEnemy: Enemy | undefined =
+    room.enemyId !== undefined ? state.enemies[room.enemyId] : undefined;
+
+  // Resolve and validate the intent/target matrix. Rejections never roll,
+  // never cost a turn, and never change state.
+  let subject: Enemy | undefined;
+  let chosenExit: (typeof room.exits)[number] | undefined;
+  if (intent === "learn") {
+    if (room.enemyId !== undefined && normalized === room.enemyId) {
+      return reject("attempt", "You cannot learn about an enemy that way.");
+    }
+    if (normalized !== "room") {
+      chosenExit = room.exits.find((e) => e.direction === normalized);
+      if (chosenExit === undefined) {
+        return reject("attempt", `There is no exit to the ${normalized}.`);
+      }
+    }
+    subject = roomEnemy !== undefined && !roomEnemy.defeated ? roomEnemy : undefined;
+  } else {
+    // harm / pass / distract need a living enemy in the room.
+    if (roomEnemy === undefined) {
+      return reject("attempt", "There is no enemy here.");
+    }
+    if (roomEnemy.defeated) {
+      return reject("attempt", `The ${roomEnemy.name} is already defeated.`);
+    }
+    if (intent === "pass" && normalized !== roomEnemy.id) {
+      chosenExit = room.exits.find((e) => e.direction === normalized);
+      if (chosenExit === undefined) {
+        return reject(
+          "attempt",
+          `There is no exit to the ${normalized}, and no such enemy here.`,
+        );
+      }
+    } else if (normalized !== roomEnemy.id) {
+      return reject("attempt", `There is no ${displayEnemyName(world, state, normalized)} here.`);
+    }
+    if (intent === "pass" && state.flags[`sneaked:${room.id}`] === true) {
+      return reject("attempt", `You're already past the ${roomEnemy.name}.`);
+    }
+    subject = roomEnemy;
+  }
+
+  const modifier = subject?.attemptModifiers?.[approach] ?? 0;
+  const priors = subject !== undefined ? priorAttempts(state, subject.id, approach) : 0;
+  const targetNumber = 12 + modifier + 2 * priors;
+
+  const rolls: ToolResult["rolls"] = [];
+  const events: string[] = [];
+  const roll = rollDie(20, rng, "attempt", targetNumber);
+  const result: "success" | "partial" | "fail" =
+    roll.value >= targetNumber ? "success" : roll.value >= targetNumber - 3 ? "partial" : "fail";
+  roll.success = result === "success";
+  roll.result = result;
+  rolls.push(roll);
+
+  if (subject !== undefined) {
+    state.flags[`attempted:${subject.id}:${approach}:${priors + 1}`] = true;
+  }
+
+  if (result === "fail") {
+    events.push("Your attempt fails.");
+  } else if (intent === "harm" && subject !== undefined) {
+    const damageRoll = rollDie(4, rng, "attempt damage", 0);
+    rolls.push(damageRoll);
+    subject.hp -= damageRoll.value;
+    events.push(`You hit the ${subject.name} for ${damageRoll.value} damage.`);
+    if (subject.hp <= 0) {
+      subject.defeated = true;
+      events.push(`You defeated the ${subject.name}.`);
+      for (const lootId of subject.loot) {
+        room.items.push(lootId);
+        events.push(`The ${subject.name} dropped ${itemName(world, lootId)}.`);
+      }
+    }
+  } else if (intent === "pass") {
+    state.flags[`sneaked:${room.id}`] = true;
+    events.push(
+      subject !== undefined
+        ? `You got past the ${subject.name}.`
+        : "You slipped through.",
+    );
+  } else if (intent === "distract" && subject !== undefined) {
+    state.flags[`distracted:${room.id}:${subject.id}`] = true;
+    events.push(`The ${subject.name} is distracted.`);
+  } else if (intent === "learn") {
+    if (normalized === "room") {
+      const omenExit = room.exits.find((e) => e.omen !== undefined);
+      if (omenExit !== undefined && omenExit.omen !== undefined) {
+        events.push(omenExit.omen);
+      } else {
+        // One exit only: first unvisited in exit order, else the first exit.
+        const hintExit =
+          room.exits.find((e) => !state.visitedRoomIds.includes(e.to)) ?? room.exits[0];
+        if (hintExit === undefined) {
+          events.push("There is nothing more to learn here.");
+        } else {
+          events.push(trapHint(state, room.id, hintExit.direction));
+        }
+      }
+    } else if (chosenExit !== undefined) {
+      events.push(trapHint(state, room.id, chosenExit.direction));
+    }
+  }
+
+  if (result !== "success" && subject !== undefined && !subject.defeated) {
+    enemyCounterattack(state, subject, rng, rolls, events);
+  }
+  events.push(...endTurn(state, world));
+  return { ok: true, action: "attempt", rolls, events };
 }
 
 export function throwItem(

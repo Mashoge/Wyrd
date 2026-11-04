@@ -45,7 +45,14 @@ function toDiceRoll(value: unknown): DiceRoll | null {
   if (typeof t !== "number") return null;
   if (typeof ok !== "boolean") return null;
   if (typeof b !== "number") return null;
-  return { purpose: p, sides: s, value: v, target: t, success: ok, bonus: b };
+  const roll: DiceRoll = { purpose: p, sides: s, value: v, target: t, success: ok, bonus: b };
+  // Optional attempt outcome band: keep it only when it is a known string,
+  // ignore anything else (absent, wrong type, unknown word).
+  const result = value["result"];
+  if (result === "success" || result === "partial" || result === "fail") {
+    roll.result = result;
+  }
+  return roll;
 }
 
 function toToolResult(value: unknown): ToolResult | null {

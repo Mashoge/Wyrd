@@ -66,6 +66,13 @@ export function formatRoll(roll: DiceRoll): string {
     case "sneak": {
       return `🎲 Sneak roll: ${roll.value} (needed ${roll.target}+) → ${roll.success ? "success" : "fail"}`;
     }
+    case "attempt": {
+      const outcome = roll.result ?? (roll.success ? "success" : "fail");
+      return `🎲 Attempt roll: ${roll.value} (needed ${roll.target}+) → ${outcome}`;
+    }
+    case "attempt damage": {
+      return `🎲 Attempt damage: ${roll.value}`;
+    }
     case "grab": {
       return `🎲 Grab roll: ${roll.value} (needed ${roll.target}+) → ${roll.success ? "success" : "fail"}`;
     }
