@@ -29,6 +29,8 @@ export interface Enemy {
   blocksRetreat: boolean;
   alertness: number;
   quirk: string;
+  /** Server-only secret: item that lures this enemy away when thrown. Never expose to player/AI. */
+  lureItemId?: string;
 }
 
 export interface Room {

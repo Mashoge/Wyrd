@@ -29,7 +29,7 @@ function itemName(world: World, itemId: string): string {
 
 function bestWeapon(world: World, state: GameState): Item | undefined {
   let best: Item | undefined = undefined;
-  let bestScore = -1;
+  let bestScore = -Infinity;
   for (const itemId of state.inventory) {
     const item = world.items[itemId];
     if (item === undefined || item.kind !== "weapon") continue;
@@ -56,8 +56,8 @@ export function examine(state: GameState, world: World, itemId: string): ToolRes
   let detail = `${item.name}: ${item.description}`;
   if (item.kind === "weapon") {
     const parts: string[] = [];
-    if (item.attackBonus !== undefined) parts.push(`+${item.attackBonus} attack`);
-    if (item.damageBonus !== undefined) parts.push(`+${item.damageBonus} damage`);
+    if (item.attackBonus !== undefined) parts.push(`${item.attackBonus >= 0 ? "+" : ""}${item.attackBonus} attack`);
+    if (item.damageBonus !== undefined) parts.push(`${item.damageBonus >= 0 ? "+" : ""}${item.damageBonus} damage`);
     if (parts.length > 0) detail += ` (${parts.join(", ")})`;
   } else if (item.kind === "consumable" && item.heal !== undefined) {
     detail += ` (restores ${item.heal} HP)`;
@@ -233,7 +233,7 @@ export function useItem(
   if (item.kind === "consumable") {
     const heal = item.heal ?? 0;
     if (state.hp >= state.maxHp) {
-      return reject("useItem", "You are already at full health.");
+      return reject("useItem", "You are already unhurt.");
     }
     const recovered = Math.min(heal, state.maxHp - state.hp);
     state.hp += recovered;
@@ -281,6 +281,7 @@ export function attack(
   world: World,
   enemyId: string,
   rng: Rng,
+  weaponId?: string,
 ): ToolResult {
   if (state.status !== "playing") {
     return gameOverResult("attack");
@@ -293,9 +294,21 @@ export function attack(
   if (enemy.defeated) {
     return reject("attack", `The ${enemy.name} is already defeated.`);
   }
+  let weapon: Item | undefined;
+  if (weaponId !== undefined) {
+    if (!state.inventory.includes(weaponId)) {
+      return reject("attack", `You do not have the ${itemName(world, weaponId)}.`);
+    }
+    const chosen = world.items[weaponId];
+    if (chosen === undefined || chosen.kind !== "weapon") {
+      return reject("attack", `The ${itemName(world, weaponId)} is not a weapon.`);
+    }
+    weapon = chosen;
+  } else {
+    weapon = bestWeapon(world, state);
+  }
   const rolls: ToolResult["rolls"] = [];
   const events: string[] = [];
-  const weapon = bestWeapon(world, state);
   const attackBonus = weapon?.attackBonus ?? 0;
   const damageBonus = weapon?.damageBonus ?? 0;
   const hitTarget = 10 - attackBonus;
@@ -351,11 +364,18 @@ export function sneak(
   if (state.flags[`sneaked:${room.id}`] === true) {
     return reject("sneak", `You're already past the ${enemy.name}.`);
   }
+  const distractedKey = `distracted:${room.id}:${enemyId}`;
+  const distracted = state.flags[distractedKey] === true;
+  // Distraction is consumed by the next sneak attempt, success or fail.
+  if (distracted) {
+    delete state.flags[distractedKey];
+  }
+  const sneakTarget = distracted ? 9 : 13;
   const rolls: ToolResult["rolls"] = [];
   const events: string[] = [];
-  const sneakRoll = rollDie(20, rng, "sneak", 13);
+  const sneakRoll = rollDie(20, rng, "sneak", sneakTarget);
   rolls.push(sneakRoll);
-  if (sneakRoll.value >= 13) {
+  if (sneakRoll.value >= sneakTarget) {
     state.flags[`sneaked:${room.id}`] = true;
     events.push(`You sneaked past the ${enemy.name}.`);
   } else {
@@ -365,3 +385,43 @@ export function sneak(
   events.push(...endTurn(state, world));
   return { ok: true, action: "sneak", rolls, events };
 }
+
+export function throwItem(
+  state: GameState,
+  world: World,
+  itemId: string,
+  enemyId: string,
+): ToolResult {
+  if (state.status !== "playing") {
+    return gameOverResult("throw");
+  }
+  const room = state.rooms[state.currentRoomId];
+  const enemy = state.enemies[enemyId];
+  if (room === undefined || enemy === undefined || room.enemyId !== enemyId) {
+    return reject("throw", `There is no ${displayEnemyName(world, state, enemyId)} here.`);
+  }
+  if (enemy.defeated) {
+    return reject("throw", `The ${enemy.name} is already defeated.`);
+  }
+  if (state.flags[`sneaked:${room.id}`] === true) {
+    return reject("throw", `You're already past the ${enemy.name}.`);
+  }
+  const itemIndex = state.inventory.indexOf(itemId);
+  if (itemIndex === -1) {
+    return reject("throw", `You do not have the ${itemName(world, itemId)}.`);
+  }
+  state.inventory.splice(itemIndex, 1);
+  room.items.push(itemId);
+  const name = itemName(world, itemId);
+  const events: string[] = [];
+  if (enemy.lureItemId === itemId) {
+    state.flags[`sneaked:${room.id}`] = true;
+    events.push(`You throw the ${name}. The ${enemy.name} goes after it, and the way is open.`);
+  } else {
+    state.flags[`distracted:${room.id}:${enemyId}`] = true;
+    events.push(`You throw the ${name}. The ${enemy.name} is distracted.`);
+  }
+  events.push(...endTurn(state, world));
+  return { ok: true, action: "throw", rolls: [], events };
+}
+

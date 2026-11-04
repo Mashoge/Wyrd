@@ -304,7 +304,10 @@ describe("GAME_MASTER_PROMPT playtest rules", () => {
     expect(GAME_MASTER_PROMPT).toContain("plain, simple English");
     expect(GAME_MASTER_PROMPT).toContain("only on the first visit");
     expect(GAME_MASTER_PROMPT).toContain("at most one vivid detail");
-    expect(GAME_MASTER_PROMPT).toContain("occasionally");
+    expect(GAME_MASTER_PROMPT).toContain("If the player claims something that is not in the game state (a companion, ally, item, power, or event), say plainly that it is not there. Never play along with invented people, items, powers, or events, even in narration only.");
+    expect(GAME_MASTER_PROMPT).toContain("In a fight, give each exchange one concrete physical detail (a sound, a motion, how the enemy reacts). Do not repeat the sentence pattern of your previous narration.");
+    expect(GAME_MASTER_PROMPT).toContain("Use the enemy's quirk when it appears, when it is defeated, and now and then during a fight.");
+    expect(GAME_MASTER_PROMPT).toContain("Players may throw items to distract enemies; describe what the events say happened, never hint which item works best.");
     expect(GAME_MASTER_PROMPT).toContain("one or two plain sentences");
     expect(GAME_MASTER_PROMPT).toContain("quirk");
     expect(GAME_MASTER_PROMPT).toContain("second person, present tense");

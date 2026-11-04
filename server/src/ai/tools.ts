@@ -1,5 +1,5 @@
 import type { GameState, Rng, ToolResult, World } from "../game/types.js";
-import { attack, examine, move, pickUp, sneak, useItem } from "../game/rules.js";
+import { attack, examine, move, pickUp, sneak, throwItem, useItem } from "../game/rules.js";
 import { playerView } from "./view.js";
 
 export interface ToolFunctionParameter {
@@ -61,9 +61,21 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   ),
   def(
     "attack",
-    "Attack the enemy in the current room. Fails if no such enemy is here or it is already defeated.",
-    { enemy_id: { type: "string", description: "ID of the enemy to attack." } },
+    "Attack the enemy in the current room. Fails if no such enemy is here or it is already defeated. The player may name a weapon to attack with, e.g. 'attack with the bone'; pass weapon_id only when the player names one.",
+    {
+      enemy_id: { type: "string", description: "ID of the enemy to attack." },
+      weapon_id: { type: "string", description: "Optional ID of the inventory weapon to attack with, e.g. 'thigh_bone'." },
+    },
     ["enemy_id"],
+  ),
+  def(
+    "throw",
+    "Throw an inventory item at or toward the enemy in the current room to distract it or lure it away. Fails if the item is not held, no such enemy is here, or it is already defeated.",
+    {
+      item_id: { type: "string", description: "ID of the inventory item to throw." },
+      enemy_id: { type: "string", description: "ID of the enemy to throw at." },
+    },
+    ["item_id", "enemy_id"],
   ),
   def(
     "sneak",
@@ -85,7 +97,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   ),
 ];
 
-const KNOWN_TOOLS = new Set(["move", "pick_up", "use_item", "attack", "sneak", "look", "examine"]);
+const KNOWN_TOOLS = new Set(["move", "pick_up", "use_item", "attack", "sneak", "look", "examine", "throw"]);
 
 function invalidArgs(action: string, reason: string): ToolResult {
   return { ok: false, action, reason, rolls: [], events: [] };
@@ -175,7 +187,20 @@ export function executeTool(
       if (enemyId === null) {
         return invalidArgs(name, 'Invalid arguments: "enemy_id" must be a non-empty string.');
       }
-      return attack(state, world, enemyId, rng);
+      // weapon_id is optional; a present-but-invalid value is ignored (null).
+      const weaponId = getStringArg(args, "weapon_id");
+      return attack(state, world, enemyId, rng, weaponId ?? undefined);
+    }
+    case "throw": {
+      const itemId = getStringArg(args, "item_id");
+      if (itemId === null) {
+        return invalidArgs(name, 'Invalid arguments: "item_id" must be a non-empty string.');
+      }
+      const enemyId = getStringArg(args, "enemy_id");
+      if (enemyId === null) {
+        return invalidArgs(name, 'Invalid arguments: "enemy_id" must be a non-empty string.');
+      }
+      return throwItem(state, world, itemId, enemyId);
     }
     case "sneak": {
       const enemyId = getStringArg(args, "enemy_id");

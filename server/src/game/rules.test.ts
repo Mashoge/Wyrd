@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createGameState } from "./state.js";
-import { attack, endTurn, examine, move, pickUp, sneak, useItem } from "./rules.js";
+import { attack, endTurn, examine, move, pickUp, sneak, throwItem, useItem } from "./rules.js";
 import type { GameState, Rng, World } from "./types.js";
 
 function seqRng(values: number[]): Rng {
@@ -81,6 +81,14 @@ function makeWorld(): World {
         attackBonus: 0,
         damageBonus: 1,
       },
+      bone: {
+        id: "bone",
+        name: "Thigh Bone",
+        description: "A heavy bone, gnawed clean and good for swinging.",
+        kind: "weapon",
+        attackBonus: -2,
+        damageBonus: 3,
+      },
       draught: {
         id: "draught",
         name: "Healing Draught",
@@ -100,6 +108,7 @@ function makeWorld(): World {
         blocksRetreat: false,
         alertness: 5,
         quirk: "Picks its teeth.",
+        lureItemId: "coin",
       },
       dragon: {
         id: "dragon",
@@ -490,7 +499,7 @@ describe("useItem", () => {
     const before = snapshot(state);
     const result = useItem(state, world, "draught");
     expect(result.ok).toBe(false);
-    expect(result.reason).toBe("You are already at full health.");
+    expect(result.reason).toBe("You are already unhurt.");
     expect(state).toEqual(before);
   });
 
@@ -611,6 +620,65 @@ describe("attack", () => {
     expect(bareResult.ok).toBe(true);
     expect(bareResult.events).toContain("You defeated the Goblin.");
     expect(bareResult.events.filter((e) => e.includes("dropped"))).toEqual([]);
+  });
+
+  it("uses a chosen weapon even when it is not the best (bone: target 12, damage d4+4)", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.inventory.push("dagger", "bone");
+    // bone: target 10-(-2)=12, damage bonus 1+3=4. d20=12 hit, d4=2 -> 6 damage kills goblin (5 hp).
+    const result = attack(state, world, "goblin", seqRng([0.55, 0.3]), "bone");
+    expect(result.ok).toBe(true);
+    expect(result.rolls[0]).toMatchObject({ target: 12, success: true });
+    expect(result.rolls[1]).toMatchObject({ sides: 4, value: 2, bonus: 4 });
+    expect(result.events[0]).toBe("You strike with the Thigh Bone.");
+    expect(state.enemies["goblin"]!.defeated).toBe(true);
+  });
+
+  it("rejects a chosen weapon that is not in the inventory, with no rolls or state change", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.inventory.push("dagger");
+    const before = snapshot(state);
+    const result = attack(state, world, "goblin", seqRng([]), "bone");
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("You do not have the Thigh Bone.");
+    expect(result.rolls).toEqual([]);
+    expect(state).toEqual(before);
+  });
+
+  it("rejects a chosen item that is not a weapon, with no rolls or state change", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.inventory.push("torch");
+    const before = snapshot(state);
+    const result = attack(state, world, "goblin", seqRng([]), "torch");
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("The Torch is not a weapon.");
+    expect(result.rolls).toEqual([]);
+    expect(state).toEqual(before);
+  });
+
+  it("picks the bone as best weapon when it is the only weapon (target 12, not bare-handed 10)", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.inventory.push("bone");
+    // d20=11 would hit bare-handed (target 10) but misses with the bone (target 12); enemy d20=5 misses.
+    const result = attack(state, world, "goblin", seqRng([0.5, 0.2]));
+    expect(result.ok).toBe(true);
+    expect(result.rolls[0]).toMatchObject({ target: 12, success: false });
+    expect(result.events[0]).toBe("You strike with the Thigh Bone.");
+  });
+
+  it("formats negative weapon bonuses without a double sign on examine", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.inventory.push("bone");
+    const result = examine(state, world, "bone");
+    expect(result.ok).toBe(true);
+    expect(result.events[0]).toContain("-2 attack");
+    expect(result.events[0]).toContain("+3 damage");
+    expect(result.events[0]).not.toContain("+-");
   });
 
   it("rejects an enemy that is not in the room", () => {
@@ -743,6 +811,104 @@ describe("sneak", () => {
     expect(second.events).toEqual([]);
     expect(state).toEqual(before);
     expect(state.turn).toBe(1);
+  });
+});
+
+describe("throwItem", () => {
+  it("lure throw sets the sneaked flag with no rolls, drops the item, and it can be picked back up", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.inventory.push("coin");
+    // coin is the goblin's lure. seqRng([]) proves no rolls happen.
+    const result = throwItem(state, world, "coin", "goblin");
+    expect(result.ok).toBe(true);
+    expect(result.action).toBe("throw");
+    expect(result.rolls).toEqual([]);
+    expect(state.flags["sneaked:entrance"]).toBe(true);
+    expect(state.inventory).not.toContain("coin");
+    expect(state.rooms["entrance"]!.items).toContain("coin");
+    expect(state.turn).toBe(1);
+    expect(result.events[0]).toContain("goes after it");
+    // Already past: throwing again is rejected, so the item is not wasted.
+    state.inventory.push("coin");
+    const before = snapshot(state);
+    const again = throwItem(state, world, "coin", "goblin");
+    expect(again.ok).toBe(false);
+    expect(state).toEqual(before);
+    // The thrown coin can be picked back up (already past, so no watcher roll).
+    const grab = pickUp(state, world, "coin", seqRng([]));
+    expect(grab.ok).toBe(true);
+    expect(state.inventory).toContain("coin");
+  });
+
+  it("non-lure throw distracts: next sneak succeeds on 9-12 with target 9, flag consumed, then back to 13", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.inventory.push("torch");
+    const result = throwItem(state, world, "torch", "goblin");
+    expect(result.ok).toBe(true);
+    expect(result.rolls).toEqual([]);
+    expect(state.flags["distracted:entrance:goblin"]).toBe(true);
+    expect(state.flags["sneaked:entrance"]).toBeUndefined();
+    expect(state.inventory).not.toContain("torch");
+    expect(state.rooms["entrance"]!.items).toContain("torch");
+    expect(result.events[0]).toContain("distracted");
+    // d20=10: fails at 13, succeeds at distracted target 9. No counterattack on success.
+    const sneaked = sneak(state, world, "goblin", seqRng([0.45]));
+    expect(sneaked.ok).toBe(true);
+    expect(sneaked.rolls[0]).toMatchObject({ purpose: "sneak", value: 10, target: 9, success: true });
+    expect(state.flags["sneaked:entrance"]).toBe(true);
+    expect(state.flags["distracted:entrance:goblin"]).toBeUndefined();
+  });
+
+  it("consumes the distraction even on a failed sneak, and repeated throws do not stack", () => {
+    const world = makeWorld();
+    const state = makeState(world);
+    state.inventory.push("torch", "key");
+    throwItem(state, world, "torch", "goblin");
+    throwItem(state, world, "key", "goblin");
+    expect(state.flags["distracted:entrance:goblin"]).toBe(true);
+    // d20=3 fails even at 9; enemy d20=5 misses. Flag must be gone afterwards.
+    const failed = sneak(state, world, "goblin", seqRng([0.1, 0.2]));
+    expect(failed.ok).toBe(true);
+    expect(failed.rolls[0]).toMatchObject({ target: 9, success: false });
+    expect(state.flags["distracted:entrance:goblin"]).toBeUndefined();
+    // Next sneak is back to target 13: d20=10 now fails; enemy misses.
+    const normal = sneak(state, world, "goblin", seqRng([0.45, 0.2]));
+    expect(normal.rolls[0]).toMatchObject({ target: 13, success: false });
+  });
+
+  it("rejects game over, missing item, wrong-room enemy, and defeated enemy with no state change", () => {
+    const world = makeWorld();
+
+    const over = makeState(world);
+    over.status = "lost";
+    over.inventory.push("torch");
+    const overBefore = snapshot(over);
+    expect(throwItem(over, world, "torch", "goblin").ok).toBe(false);
+    expect(over).toEqual(overBefore);
+
+    const noItem = makeState(world);
+    const noItemBefore = snapshot(noItem);
+    const missing = throwItem(noItem, world, "torch", "goblin");
+    expect(missing.ok).toBe(false);
+    expect(missing.reason).toBe("You do not have the Torch.");
+    expect(noItem).toEqual(noItemBefore);
+
+    const wrongRoom = makeState(world);
+    wrongRoom.inventory.push("torch");
+    const wrongBefore = snapshot(wrongRoom);
+    expect(throwItem(wrongRoom, world, "torch", "dragon").ok).toBe(false);
+    expect(wrongRoom).toEqual(wrongBefore);
+
+    const dead = makeState(world);
+    dead.inventory.push("torch");
+    dead.enemies["goblin"]!.defeated = true;
+    const deadBefore = snapshot(dead);
+    const deadResult = throwItem(dead, world, "torch", "goblin");
+    expect(deadResult.ok).toBe(false);
+    expect(deadResult.reason).toContain("already defeated");
+    expect(dead).toEqual(deadBefore);
   });
 });
 

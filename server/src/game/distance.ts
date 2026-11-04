@@ -40,6 +40,7 @@ function roomsWord(n: number): string {
  * Otherwise measures current room -> relic's room.
  */
 export function nearMissMessage(state: GameState, world: World): string | null {
+  if (state.status === "won") return null;
   if (state.inventory.includes(world.relicItemId)) {
     const d = roomDistance(world, state.currentRoomId, world.exitRoomId);
     if (d === null) return null;

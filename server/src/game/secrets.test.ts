@@ -178,7 +178,7 @@ describe("commit / verify", () => {
 
 describe("canonicalSecrets", () => {
   it("pins the rules version first", () => {
-    expect(RULES_VERSION).toBe("wyrd-rules-v1");
+    expect(RULES_VERSION).toBe("wyrd-rules-v2");
   });
 
   it("uses exactly the documented key order", () => {
@@ -188,7 +188,7 @@ describe("canonicalSecrets", () => {
     };
     const salt = "abc123";
     expect(canonicalSecrets(secrets, salt)).toBe(
-      '{"rulesVersion":"wyrd-rules-v1","relicRoomId":"library","trapRoomId":"hall","trapDirection":"east","salt":"abc123"}',
+      '{"rulesVersion":"wyrd-rules-v2","relicRoomId":"library","trapRoomId":"hall","trapDirection":"east","salt":"abc123"}',
     );
     const canonical = canonicalSecrets(secrets, salt);
     const versionIdx = canonical.indexOf('"rulesVersion"');

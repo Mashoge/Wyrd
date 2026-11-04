@@ -252,10 +252,21 @@ describe("validateWorld", () => {
   });
 
   it("rejects negative and non-integer bonuses", () => {
-    const neg = clone();
-    neg.items["rusty_dagger"]!.attackBonus = -1;
+    // Negative attackBonus is legal (Thigh Bone is -2); negative damageBonus is not.
+    const negOk = clone();
+    negOk.items["rusty_dagger"]!.attackBonus = -1;
     expect(
-      validateWorld(neg).some((e) => e.includes("attackBonus")),
+      validateWorld(negOk).some((e) => e.includes("attackBonus")),
+    ).toBe(false);
+    const negFloat = clone();
+    negFloat.items["rusty_dagger"]!.attackBonus = -1.5;
+    expect(
+      validateWorld(negFloat).some((e) => e.includes("attackBonus")),
+    ).toBe(true);
+    const neg = clone();
+    neg.items["rusty_dagger"]!.damageBonus = -1;
+    expect(
+      validateWorld(neg).some((e) => e.includes("damageBonus")),
     ).toBe(true);
     const float = clone();
     float.items["rusty_dagger"]!.damageBonus = 1.5;

@@ -42,7 +42,7 @@ describe("playerView leaks nothing", () => {
     const view = playerView(state, sunkenCrypt);
     const json = JSON.stringify(view);
     const keys = allKeys(view);
-    for (const banned of ["secrets", "salt", "commitment", "trap", "alertness", "blocksRetreat"]) {
+    for (const banned of ["secrets", "salt", "commitment", "trap", "alertness", "blocksRetreat", "lureItemId"]) {
       expect(keys.has(banned)).toBe(false);
     }
     expect(view.enemy).toBeNull();
@@ -78,6 +78,18 @@ describe("playerView leaks nothing", () => {
     expect(allKeys(view).has("alertness")).toBe(false);
     expect(allKeys(view).has("blocksRetreat")).toBe(false);
     expect(JSON.stringify(view.enemy)).not.toContain('"hp"');
+  });
+
+  it("shows distracted only while the distracted flag is set, and never leaks lureItemId", () => {
+    const state = freshGame();
+    state.currentRoomId = "goblin_den";
+    let view = playerView(state, sunkenCrypt);
+    expect(view.enemy?.distracted).toBe(false);
+    state.flags["distracted:goblin_den:goblin"] = true;
+    view = playerView(state, sunkenCrypt);
+    expect(view.enemy?.distracted).toBe(true);
+    expect(JSON.stringify(view)).not.toContain("lureItemId");
+    expect(allKeys(view).has("lureItemId")).toBe(false);
   });
 
   it("shows passed once sneaked past", () => {

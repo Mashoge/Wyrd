@@ -92,8 +92,12 @@ export function validateWorld(world: World): string[] {
       errors.push(`Item "${key}" has invalid kind "${item.kind}".`);
       continue;
     }
+    // attackBonus may be negative (a clumsy but hard-hitting weapon); it only
+    // has to be an integer. damageBonus and heal must stay non-negative.
+    if (item.attackBonus !== undefined && !Number.isInteger(item.attackBonus)) {
+      errors.push(`Item "${key}" has invalid attackBonus ${item.attackBonus}: must be an integer.`);
+    }
     for (const [field, value] of [
-      ["attackBonus", item.attackBonus],
       ["damageBonus", item.damageBonus],
       ["heal", item.heal],
     ] as const) {

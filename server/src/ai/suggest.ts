@@ -44,18 +44,23 @@ function isDrinkable(viewId: string, viewName: string, world: World | undefined)
 }
 
 function attackTarget(world: World | undefined, view: PlayerView): number {
-  let best = 0;
-  let found = false;
+  // Mirror rules.bestWeapon scoring: best attack+damage score wins, then the
+  // target comes from that weapon's attackBonus (which may be negative).
+  let bestScore = -Infinity;
+  let bestAttackBonus = 0;
   if (world !== undefined) {
     for (const inv of view.player.inventory) {
       const item = world.items[inv.id];
       if (item !== undefined && item.kind === "weapon") {
-        found = true;
-        best = Math.max(best, item.attackBonus ?? 0);
+        const score = (item.attackBonus ?? 0) + (item.damageBonus ?? 0);
+        if (score > bestScore) {
+          bestScore = score;
+          bestAttackBonus = item.attackBonus ?? 0;
+        }
       }
     }
   }
-  return 10 - (found ? best : 0);
+  return 10 - bestAttackBonus;
 }
 
 function pickUpTarget(view: PlayerView, world: World | undefined): number | undefined {
@@ -143,7 +148,11 @@ export function suggestActions(view: PlayerView, world?: World, lastRoomId?: str
   // Combat: sneak unless already passed or the foe is down, otherwise attack first.
   const livingEnemy = view.enemy !== null && !view.enemy.defeated ? view.enemy : null;
   if (livingEnemy !== null && !livingEnemy.passed) {
-    out.push({ text: `Sneak past the ${livingEnemy.name}`, kind: "sneak", target: 13 });
+    out.push({
+      text: `Sneak past the ${livingEnemy.name}`,
+      kind: "sneak",
+      target: livingEnemy.distracted ? 9 : 13,
+    });
     out.push({
       text: `Attack the ${livingEnemy.name}`,
       kind: "attack",
@@ -185,21 +194,39 @@ export function suggestActions(view: PlayerView, world?: World, lastRoomId?: str
     );
   }
 
-  // Move through open exits first.
+  // Moves: never offer a move the rule engine would reject. Locked exits are
+  // always rejected (the "Use the key" chip covers that door). With a living,
+  // unpassed enemy, only the retreat back toward lastRoomId is legal, and
+  // only when that enemy does not block retreat (checked server-side from
+  // the world; the flag itself is never rendered).
+  const enemyBlocksMoves = livingEnemy !== null && !livingEnemy.passed;
+  const foeBlocksRetreat =
+    enemyBlocksMoves && world !== undefined && livingEnemy !== null
+      ? (world.enemies[livingEnemy.id]?.blocksRetreat ?? false)
+      : false;
   for (const exit of view.exits) {
-    if (!exit.locked) {
-      pushMove(exit);
+    if (exit.locked) continue;
+    if (enemyBlocksMoves) {
+      if (foeBlocksRetreat) continue;
+      if (backDirection === null || exit.direction !== backDirection) continue;
     }
+    pushMove(exit);
   }
 
-  // Heal when hurt and holding something drinkable.
-  if (view.player.hp < view.player.maxHp) {
-    for (const inv of view.player.inventory) {
-      if (isDrinkable(inv.id, inv.name, world)) {
-        out.push({ text: `Drink the ${inv.name}`, kind: "drink" });
-        break;
-      }
+  // Heal: suggest drinking only when the draught would not be mostly wasted
+  // (hp at most maxHp - heal) or the player is at/below half health.
+  for (const inv of view.player.inventory) {
+    if (!isDrinkable(inv.id, inv.name, world)) continue;
+    const heal = world?.items[inv.id]?.heal;
+    const hp = view.player.hp;
+    const worthIt =
+      heal !== undefined
+        ? hp <= view.player.maxHp - heal || hp * 2 <= view.player.maxHp
+        : hp < view.player.maxHp;
+    if (worthIt) {
+      out.push({ text: `Drink the ${inv.name}`, kind: "drink" });
     }
+    break;
   }
 
   // Safe filler drawn only from visible things.
@@ -208,12 +235,6 @@ export function suggestActions(view: PlayerView, world?: World, lastRoomId?: str
     out.push({ text: `Examine the ${firstVisible.name}`, kind: "examine" });
   }
   out.push({ text: "Look around", kind: "look" });
-  // Locked exits last: still a valid thing to try, lowest priority.
-  for (const exit of view.exits) {
-    if (exit.locked) {
-      pushMove(exit);
-    }
-  }
 
   const deduped = dedupeKeepOrder(out);
   let capped = deduped.slice(0, 4);

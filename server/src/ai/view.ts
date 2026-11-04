@@ -22,6 +22,7 @@ export interface PlayerViewEnemy {
   defeated: boolean;
   condition: ConditionLabel;
   passed: boolean;
+  distracted: boolean;
 }
 
 export interface PlayerViewPlayer {
@@ -103,6 +104,7 @@ export function playerView(state: GameState, world: World): PlayerView {
         defeated: foe.defeated,
         condition: conditionFor(foe.hp, maxHp, foe.defeated),
         passed: state.flags[`sneaked:${room.id}`] === true && !foe.defeated,
+        distracted: state.flags[`distracted:${room.id}:${foe.id}`] === true && !foe.defeated,
       };
     }
   }

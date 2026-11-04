@@ -140,8 +140,8 @@ export const sunkenCrypt: World = {
       name: "Thigh Bone",
       description: "A heavy bone, gnawed clean and good for swinging.",
       kind: "weapon",
-      attackBonus: 0,
-      damageBonus: 1,
+      attackBonus: -2,
+      damageBonus: 3,
     },
   },
   enemies: {
@@ -166,6 +166,7 @@ export const sunkenCrypt: World = {
       blocksRetreat: false,
       alertness: 8,
       quirk: "keeps counting its coins and losing track",
+      lureItemId: "silver_coin",
     },
     bone_troll: {
       id: "bone_troll",
@@ -177,6 +178,7 @@ export const sunkenCrypt: World = {
       blocksRetreat: false,
       alertness: 0,
       quirk: "stares at its own reflection in a puddle",
+      lureItemId: "thigh_bone",
     },
   },
 };

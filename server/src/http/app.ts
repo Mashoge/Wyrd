@@ -10,7 +10,7 @@ import { nearMissMessage } from "../game/distance.js";
 import { verify } from "../game/secrets.js";
 import { startGame } from "../game/state.js";
 import { lossTip } from "../game/tips.js";
-import type { GameStatus, Rng } from "../game/types.js";
+import type { GameState, GameStatus, Rng, World } from "../game/types.js";
 import { sunkenCrypt } from "../game/worlds/sunkenCrypt.js";
 import { SessionStore } from "./sessions.js";
 import { buildMap } from "./map.js";
@@ -40,6 +40,16 @@ function allowedOrigins(): string[] {
 
 function prune(timestamps: number[], nowMs: number): number[] {
   return timestamps.filter((t) => nowMs - t < WINDOW_MS);
+}
+
+/** HP of the enemy in the player's current room, for the UI health bar only. Never sent to the AI. */
+function enemyHp(state: GameState, world: World): { current: number; max: number } | null {
+  const room = state.rooms[state.currentRoomId];
+  if (room === undefined || room.enemyId === undefined) return null;
+  const foe = state.enemies[room.enemyId];
+  const def = world.enemies[room.enemyId];
+  if (foe === undefined || def === undefined) return null;
+  return { current: Math.max(0, foe.hp), max: def.hp };
 }
 
 function sendErr(res: Response, status: number, message: string): void {
@@ -133,6 +143,7 @@ export function createApp(deps: AppDeps): Express {
         status: result.status,
         suggestions: suggestActions(result.view, sunkenCrypt, state.lastRoomId),
         map: buildMap(state, sunkenCrypt),
+        enemyHp: enemyHp(state, sunkenCrypt),
       });
     } catch {
       const look = executeTool(state, sunkenCrypt, "look", "{}", rng);
@@ -155,6 +166,7 @@ export function createApp(deps: AppDeps): Express {
         status,
         suggestions: suggestActions(view, sunkenCrypt, state.lastRoomId),
         map: buildMap(state, sunkenCrypt),
+        enemyHp: enemyHp(state, sunkenCrypt),
       });
     } finally {
       entry.busy = false;
@@ -203,6 +215,7 @@ export function createApp(deps: AppDeps): Express {
         status: result.status,
         suggestions: suggestActions(result.view, entry.session.world, entry.session.state.lastRoomId),
         map: buildMap(entry.session.state, entry.session.world),
+        enemyHp: enemyHp(entry.session.state, entry.session.world),
       });
     } catch {
       sendErr(res, 502, "The game master is unavailable, try again.");
@@ -230,6 +243,7 @@ export function createApp(deps: AppDeps): Express {
       openingNarration: entry.openingNarration ?? "",
       openingToolLog: entry.openingToolLog ?? [],
       map: buildMap(state, world),
+      enemyHp: enemyHp(state, world),
     });
   });
 

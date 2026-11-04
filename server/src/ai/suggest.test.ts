@@ -112,6 +112,8 @@ describe("suggestActions", () => {
   it("surfaces an unlocked exit with gate wording", () => {
     const state = startGame(sunkenCrypt, "s1", seqRng([0, 0]), "suggest-salt");
     state.currentRoomId = "gate_hall";
+    // The troll would otherwise block every non-retreat move chip.
+    state.enemies["bone_troll"]!.defeated = true;
     state.flags["unlocked:gate_hall:north"] = true;
     const gateExit = state.rooms["gate_hall"]?.exits.find((e) => e.direction === "north");
     if (gateExit !== undefined) gateExit.locked = false;
@@ -124,6 +126,8 @@ describe("suggestActions", () => {
   it("moves the unlocked exit first when carrying the relic", () => {
     const state = startGame(sunkenCrypt, "s1", seqRng([0, 0]), "suggest-salt");
     state.currentRoomId = "gate_hall";
+    // The troll would otherwise block every non-retreat move chip.
+    state.enemies["bone_troll"]!.defeated = true;
     state.flags["unlocked:gate_hall:north"] = true;
     const gateExit = state.rooms["gate_hall"]?.exits.find((e) => e.direction === "north");
     if (gateExit !== undefined) gateExit.locked = false;
@@ -199,6 +203,88 @@ describe("suggestActions", () => {
     expect(combo?.text).toBe("Sneak past the Goblin and grab the Silver Coin");
     expect(combo?.target).toBeUndefined();
     expect(out.length).toBeLessThanOrEqual(4);
+  });
+
+  it("shows attack target 12 for a bone-only player and 9 with bone and dagger", () => {
+    const boneOnly = startGame(sunkenCrypt, "s1", seqRng([0, 0]), "suggest-salt");
+    boneOnly.currentRoomId = "goblin_den";
+    boneOnly.inventory.push("thigh_bone");
+    const boneOut = suggestActions(playerView(boneOnly, sunkenCrypt), sunkenCrypt);
+    expect(boneOut.find((s) => s.text === "Attack the Goblin")?.target).toBe(12);
+    const both = startGame(sunkenCrypt, "s1", seqRng([0, 0]), "suggest-salt");
+    both.currentRoomId = "goblin_den";
+    both.inventory.push("thigh_bone", "rusty_dagger");
+    const bothOut = suggestActions(playerView(both, sunkenCrypt), sunkenCrypt);
+    expect(bothOut.find((s) => s.text === "Attack the Goblin")?.target).toBe(9);
+  });
+
+  it("shows sneak target 9 while the enemy is distracted and never offers a throw chip", () => {
+    const state = startGame(sunkenCrypt, "s1", seqRng([0, 0]), "suggest-salt");
+    state.currentRoomId = "goblin_den";
+    state.flags["distracted:goblin_den:goblin"] = true;
+    const view = playerView(state, sunkenCrypt);
+    const out = suggestActions(view, sunkenCrypt);
+    expect(out.find((s) => s.text === "Sneak past the Goblin")?.target).toBe(9);
+    expect(out.some((s) => s.kind === "throw")).toBe(false);
+  });
+
+  it("suggests drinking at HP 6 and 5 but not at 7-9 or full (draught heals 4 of 10)", () => {
+    const atHp = (hp: number): Suggestion[] => {
+      const state = startGame(sunkenCrypt, "s1", seqRng([0, 0]), "suggest-salt");
+      state.hp = hp;
+      state.inventory.push("healing_draught");
+      return suggestActions(playerView(state, sunkenCrypt), sunkenCrypt);
+    };
+    const hasDrink = (hp: number): boolean => atHp(hp).some((s) => s.kind === "drink");
+    expect(hasDrink(6)).toBe(true);
+    expect(hasDrink(5)).toBe(true);
+    expect(hasDrink(7)).toBe(false);
+    expect(hasDrink(8)).toBe(false);
+    expect(hasDrink(9)).toBe(false);
+    expect(hasDrink(10)).toBe(false);
+  });
+
+  it("offers no move chip in the ossuary while the Warden seals the only exit", () => {
+    const state = startGame(sunkenCrypt, "s1", seqRng([0, 0]), "suggest-salt");
+    state.currentRoomId = "ossuary";
+    state.lastRoomId = "hall";
+    state.visitedRoomIds.push("ossuary", "hall");
+    // Clear the room (seed rng puts the relic here) so the 4-chip cap does not
+    // crowd out the filler chips; a held item keeps the examine chip live.
+    state.rooms["ossuary"]!.items = [];
+    state.inventory.push("rusty_dagger");
+    const view = playerView(state, sunkenCrypt);
+    const out = suggestActions(view, sunkenCrypt, state.lastRoomId);
+    expect(out.some((s) => s.kind === "move")).toBe(false);
+    expect(texts(out).some((s) => s.includes("west"))).toBe(false);
+    // Combat chips are still offered.
+    expect(texts(out).some((s) => s.startsWith("Sneak past"))).toBe(true);
+    expect(texts(out).some((s) => s.startsWith("Attack"))).toBe(true);
+    expect(out.some((s) => s.kind === "examine" || s.kind === "look")).toBe(true);
+  });
+
+  it("still offers the retreat chip in the goblin den (goblin does not block retreat)", () => {
+    const state = startGame(sunkenCrypt, "s1", seqRng([0, 0]), "suggest-salt");
+    state.currentRoomId = "goblin_den";
+    state.lastRoomId = "hall";
+    state.visitedRoomIds.push("goblin_den", "hall");
+    // Clear the room items so the combo/pickup chips do not crowd the retreat
+    // chip out of the 4-chip cap; this isolates the move-filtering rule.
+    state.rooms["goblin_den"]!.items = [];
+    const view = playerView(state, sunkenCrypt);
+    const out = suggestActions(view, sunkenCrypt, state.lastRoomId);
+    expect(texts(out)).toContain("Go back south to Echoing Hall");
+    // The forward exit is enemy-blocked, so it is not offered.
+    expect(out.filter((s) => s.kind === "move")).toHaveLength(1);
+  });
+
+  it("never offers a locked exit as a move chip", () => {
+    const state = startGame(sunkenCrypt, "s1", seqRng([0, 0]), "suggest-salt");
+    state.currentRoomId = "gate_hall";
+    state.enemies["bone_troll"]!.defeated = true;
+    const view = playerView(state, sunkenCrypt);
+    const out = suggestActions(view, sunkenCrypt);
+    expect(out.some((s) => s.kind === "move" && s.text.toLowerCase().includes("north"))).toBe(false);
   });
 
   it("keeps working when exits carry omens", () => {

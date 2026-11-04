@@ -159,6 +159,22 @@ describe("nearMissMessage", () => {
     state.secrets = { relicRoomId: "island", trap: { roomId: "a", direction: "north" } };
     expect(nearMissMessage(state, world)).toBeNull();
   });
+
+  it("returns null for a won game, with or without the relic", () => {
+    const world = makeWorld();
+    const withRelic = createGameState(world, "s1");
+    withRelic.status = "won";
+    withRelic.currentRoomId = "b";
+    withRelic.inventory = ["relic"];
+    withRelic.secrets = { relicRoomId: "c", trap: { roomId: "a", direction: "north" } };
+    expect(nearMissMessage(withRelic, world)).toBeNull();
+    const withoutRelic = createGameState(world, "s1");
+    withoutRelic.status = "won";
+    withoutRelic.currentRoomId = "a";
+    withoutRelic.inventory = [];
+    withoutRelic.secrets = { relicRoomId: "c", trap: { roomId: "a", direction: "north" } };
+    expect(nearMissMessage(withoutRelic, world)).toBeNull();
+  });
 });
 
 describe("sunkenCrypt pacing", () => {

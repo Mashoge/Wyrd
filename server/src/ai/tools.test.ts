@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attack, examine, move, pickUp, sneak, useItem } from "../game/rules.js";
+import { attack, examine, move, pickUp, sneak, throwItem, useItem } from "../game/rules.js";
 import { startGame } from "../game/state.js";
 import type { GameState, Rng, World } from "../game/types.js";
 import { sunkenCrypt } from "../game/worlds/sunkenCrypt.js";
@@ -24,9 +24,15 @@ function snapshot(state: GameState): GameState {
 }
 
 describe("TOOL_DEFINITIONS", () => {
-  it("exposes seven tools with plain string params and no endTurn", () => {
+  it("exposes eight tools with plain string params and no endTurn", () => {
     const names = TOOL_DEFINITIONS.map((t) => t.function.name).sort();
-    expect(names).toEqual(["attack", "examine", "look", "move", "pick_up", "sneak", "use_item"]);
+    expect(names).toEqual(["attack", "examine", "look", "move", "pick_up", "sneak", "throw", "use_item"]);
+    const attackDef = TOOL_DEFINITIONS.find((t) => t.function.name === "attack");
+    expect(attackDef?.function.parameters.required).toEqual(["enemy_id"]);
+    expect(Object.keys(attackDef?.function.parameters.properties ?? {})).toContain("weapon_id");
+    expect(attackDef?.function.description).toContain("weapon");
+    const throwDef = TOOL_DEFINITIONS.find((t) => t.function.name === "throw");
+    expect(throwDef?.function.parameters.required).toEqual(["item_id", "enemy_id"]);
     const blob = JSON.stringify(TOOL_DEFINITIONS);
     expect(blob).not.toContain("endTurn");
     expect(blob).not.toContain("end_turn");
@@ -114,6 +120,36 @@ describe("executeTool more dispatch", () => {
     const expectedS = sneak(directS, s.world, "goblin", seqRng([0.99]));
     const resultS = executeTool(s.state, s.world, "sneak", '{"enemy_id":"goblin"}', seqRng([0.99]));
     expect(resultS).toEqual(expectedS);
+  });
+
+  it("attack with weapon_id dispatches to rules.attack with that weapon", () => {
+    const { state, world } = freshGame();
+    state.currentRoomId = "goblin_den";
+    state.inventory.push("rusty_dagger", "thigh_bone");
+    const direct = structuredClone(state);
+    const expected = attack(direct, world, "goblin", seqRng([0.99, 0.0, 0.0]), "thigh_bone");
+    const result = executeTool(state, world, "attack", '{"enemy_id":"goblin","weapon_id":"thigh_bone"}', seqRng([0.99, 0.0, 0.0]));
+    expect(result).toEqual(expected);
+    expect(result.events[0]).toBe("You strike with the Thigh Bone.");
+  });
+
+  it("throw dispatches to rules.throwItem and rejects invalid args", () => {
+    const { state, world } = freshGame();
+    state.currentRoomId = "goblin_den";
+    state.inventory.push("silver_coin");
+    const direct = structuredClone(state);
+    const expected = throwItem(direct, world, "silver_coin", "goblin");
+    const result = executeTool(state, world, "throw", '{"item_id":"silver_coin","enemy_id":"goblin"}', seqRng([]));
+    expect(result).toEqual(expected);
+    expect(result.ok).toBe(true);
+    expect(state.flags["sneaked:goblin_den"]).toBe(true);
+    const before = snapshot(state);
+    for (const raw of ["{}", '{"item_id":"silver_coin"}', '{"enemy_id":"goblin"}', '{"item_id":7,"enemy_id":"goblin"}']) {
+      const bad = executeTool(state, world, "throw", raw, seqRng([]));
+      expect(bad.ok).toBe(false);
+      expect(bad.reason).toMatch(/Invalid arguments/);
+    }
+    expect(state).toEqual(before);
   });
 
   it("pickUp via tool matches direct pickUp", () => {

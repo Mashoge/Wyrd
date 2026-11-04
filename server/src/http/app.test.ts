@@ -395,10 +395,43 @@ describe("reveal after forced loss", () => {
     expect(res.body.verified).toBe(true);
     expect(verifyCommit(st.secrets, res.body.salt as string, res.body.commitment as string)).toBe(true);
     expect(typeof res.body.nearMiss === "string" || res.body.nearMiss === null).toBe(true);
-    expect(res.body.rulesVersion).toBe("wyrd-rules-v1");
+    expect(res.body.rulesVersion).toBe("wyrd-rules-v2");
     expect(res.body.tip).toBe(
       "Pick up several things in one go: 'grab the key and the coin'.",
     );
+    deps.store.stop();
+  });
+});
+
+describe("enemyHp", () => {
+  it("is null at creation and tracks the current room enemy on GET, keeping hp out of the view", async () => {
+    const client = new FakeClient();
+    client.script = [{ content: "Opening." }, { content: "Still here." }];
+    const deps = makeDeps(client, { ms: 0 });
+    const app = createApp(deps);
+    const created = await request(app).post("/api/games");
+    expect(created.status).toBe(201);
+    expect(created.body.enemyHp).toBeNull();
+    const gameId = created.body.gameId as string;
+    const entry = deps.store.get(gameId);
+    if (entry === undefined) throw new Error("game missing");
+    entry.session.state.currentRoomId = "goblin_den";
+    const resumed = await request(app).get(`/api/games/${gameId}`);
+    expect(resumed.status).toBe(200);
+    expect(resumed.body.enemyHp).toEqual({ current: 5, max: 5 });
+    expect("hp" in (resumed.body.view.enemy as Record<string, unknown>)).toBe(false);
+    entry.session.state.enemies["goblin"]!.hp = 2;
+    const damaged = await request(app).get(`/api/games/${gameId}`);
+    expect(damaged.body.enemyHp).toEqual({ current: 2, max: 5 });
+    // Defeated enemy keeps { current: 0, max }; overkill clamps at 0.
+    entry.session.state.enemies["goblin"]!.hp = -3;
+    entry.session.state.enemies["goblin"]!.defeated = true;
+    const defeated = await request(app).get(`/api/games/${gameId}`);
+    expect(defeated.body.enemyHp).toEqual({ current: 0, max: 5 });
+    // Turn responses carry it too.
+    const turn = await request(app).post(`/api/games/${gameId}/turn`).send({ text: "look" });
+    expect(turn.status).toBe(200);
+    expect(turn.body.enemyHp).toEqual({ current: 0, max: 5 });
     deps.store.stop();
   });
 });
