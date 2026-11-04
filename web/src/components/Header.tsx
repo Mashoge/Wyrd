@@ -3,9 +3,10 @@ import { shortCommit } from "../format";
 
 interface Props {
   commitment: string;
+  verified: boolean;
 }
 
-export function Header({ commitment }: Props): JSX.Element {
+export function Header({ commitment, verified }: Props): JSX.Element {
   return (
     <header
       style={{
@@ -30,12 +31,22 @@ export function Header({ commitment }: Props): JSX.Element {
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <svg width="46" height="46" viewBox="0 0 48 48" role="img" aria-label="Seal, fate sealed">
-          <path d="M24 2 L43 13 L43 35 L24 46 L5 35 L5 13 Z" fill="#3A2848" stroke="#B44DFF" strokeWidth="2" />
+        <svg width="46" height="46" viewBox="0 0 48 48" role="img" aria-label={verified ? "Seal, fate verified" : "Seal, fate sealed"}>
+          {verified ? (
+            <g>
+              <path d="M24 2 L24 46 L5 35 L5 13 Z" fill="#3A2848" stroke="#4DE8B5" strokeWidth="2" transform="translate(-2,0)" />
+              <path d="M24 2 L43 13 L43 35 L24 46 Z" fill="#3A2848" stroke="#4DE8B5" strokeWidth="2" transform="translate(2,0)" />
+              <path d="M24 3 L21 14 L26 22 L20 33 L24 45" fill="none" stroke="#F4EFF6" strokeWidth="1.4" />
+            </g>
+          ) : (
+            <path d="M24 2 L43 13 L43 35 L24 46 L5 35 L5 13 Z" fill="#3A2848" stroke="#B44DFF" strokeWidth="2" />
+          )}
           <text x="24" y="30" textAnchor="middle" fontSize="16" fill="#F4EFF6" className="font-rune">ᚹ</text>
         </svg>
         <div style={{ display: "flex", flexDirection: "column" }}>
-          <span className="font-title" style={{ fontSize: 12, color: "#B9AEC0" }}>Fate sealed</span>
+          <span className="font-title" style={{ fontSize: 12, color: verified ? "#4DE8B5" : "#B9AEC0" }}>
+            {verified ? "Fate verified" : "Fate sealed"}
+          </span>
           <span style={{ fontFamily: "ui-monospace,Menlo,monospace", fontSize: 12, color: "#F4EFF6" }}>
             {shortCommit(commitment)}
           </span>
@@ -44,4 +55,3 @@ export function Header({ commitment }: Props): JSX.Element {
     </header>
   );
 }
-

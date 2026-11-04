@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, JSX, RefObject } from "react";
-import { motion } from "framer-motion";
 import { ApiError, bootGame, clearGameId, createGame, loadGameId, playTurn, saveGameId } from "./api";
 import type { GameMap, GameStatus, PlayerView, Suggestion, ToolLogEntry } from "./api";
 import { ActionForm } from "./components/ActionForm";
 import { Header } from "./components/Header";
 import { Sidebar } from "./components/Sidebar";
+import { loadCommitment, resolveStoredCommitment } from "./api-commit";
+import { GameOver } from "./components/GameOver";
 import { StoryFeed, createTurnId, type Turn } from "./components/StoryFeed";
 import { Suggestions } from "./components/Suggestions";
 import { BootScreen, type BootPhase } from "./components/BootScreen";
@@ -13,6 +14,9 @@ import { BootScreen, type BootPhase } from "./components/BootScreen";
 interface LoadedGame {
   gameId: string;
   commitment: string;
+  storedCommitment: string | null;
+  sealMismatch: boolean;
+  verified: boolean;
   view: PlayerView;
   status: GameStatus;
   map: GameMap;
@@ -55,7 +59,8 @@ export function App(): JSX.Element {
   const applyGameData = useCallback(
     (g: { gameId: string; commitment: string; view: PlayerView; status: GameStatus; map?: GameMap }, fresh: boolean, narration: string | null, toolLog: ToolLogEntry[], sug: Suggestion[]): void => {
       saveGameId(g.gameId);
-      setGame({ gameId: g.gameId, commitment: g.commitment, view: g.view, status: g.status, map: g.map ?? { rooms: [], links: [], unexplored: [] } });
+      const resolved = resolveStoredCommitment(g.gameId, g.commitment);
+      setGame((prev) => ({ gameId: g.gameId, commitment: g.commitment, storedCommitment: resolved.stored, sealMismatch: resolved.sealMismatch, verified: prev !== null && prev.gameId === g.gameId ? prev.verified : false, view: g.view, status: g.status, map: g.map ?? { rooms: [], links: [], unexplored: [] } }));
       if (fresh && narration !== null) {
         setTurns([freshTurn(null, narration, toolLog)]);
       } else if (!fresh && narration !== null) {
@@ -257,11 +262,11 @@ export function App(): JSX.Element {
     }
   }, [applyGameData]);
 
-  const over = game !== null && game.status !== "playing";
+  const markVerified = useCallback((): void => { setGame((prev) => (prev === null ? prev : { ...prev, verified: true })); }, []);  const over = game !== null && game.status !== "playing";
   const won = game !== null && game.status === "won";
 
   return AppLayout({
-    game, turns, ledger, suggestions, busy, booting, bootPhase, bootFresh, bootCommitment, bootSlow, error, over, won, storyScrollRef, onStoryScroll: handleStoryScroll, sendAction, retryTurn, retryBoot: boot, newGame,
+    game, turns, ledger, suggestions, busy, booting, bootPhase, bootFresh, bootCommitment, bootSlow, error, over, won, storyScrollRef, onStoryScroll: handleStoryScroll, sendAction, retryTurn, retryBoot: boot, newGame, markVerified,
   });
 }
 
@@ -283,16 +288,16 @@ interface LayoutArgs {
   onStoryScroll: () => void;
   sendAction: (text: string) => Promise<void>;
   retryTurn: (id: string, text: string) => Promise<void>;
-  retryBoot: () => Promise<void>;
+  retryBoot: () => Promise<void>; markVerified: () => void;
   newGame: () => Promise<void>;
 }
 
 function AppLayout(args: LayoutArgs): JSX.Element {
-  const { game, turns, ledger, suggestions, busy, booting, bootPhase, bootFresh, bootCommitment, bootSlow, error, over, won, storyScrollRef, onStoryScroll, sendAction, retryTurn, retryBoot, newGame } = args;
+  const { game, turns, ledger, suggestions, busy, booting, bootPhase, bootFresh, bootCommitment, bootSlow, error, over, won, storyScrollRef, onStoryScroll, sendAction, retryTurn, retryBoot, newGame, markVerified } = args;
   return (
     <div className="wyrd-app" style={appShellStyle}>
       <div className="wyrd-app-inner" style={appInnerStyle}>
-        {game !== null && <Header commitment={game.commitment} />}
+        {game !== null && <Header commitment={game.commitment} verified={game.verified} />}
         <div className="font-rune" aria-hidden="true" style={runeStyle}>
           ᚹ ᚣ ᚱ ᛞ ᛫ ᚠ ᚨ ᛏ ᛖ ᛫ ᚹ ᚣ ᚱ ᛞ ᛫ ᚠ ᚨ ᛏ ᛖ ᛫ ᚹ ᚣ ᚱ ᛞ
         </div>
@@ -308,16 +313,17 @@ function AppLayout(args: LayoutArgs): JSX.Element {
         {error !== null && !booting && (
           <div role="alert" style={alertStyle}>{error}</div>
         )}
+        {over && game !== null && (
+          <GameOver gameId={game.gameId} storedCommitment={game.storedCommitment ?? loadCommitment(game.gameId) ?? game.commitment} sealMismatch={game.sealMismatch} won={won} onVerified={markVerified} />
+        )}
         {over && (
-          <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }} className="panel-cut" style={bannerStyle(won)}>
-            <div className="font-title" style={bannerTitle(won)}>{won ? "Won" : "Lost"}</div>
-            <div className="font-story" style={bannerSub}>
-              {won ? "The gate gives way. Your wyrd holds." : "The crypt keeps you. Your thread runs out."}
+          <div className="panel-cut" style={bannerRowStyle}>
+            <div style={newGameRow}>
+              <button type="button" className="wyrd-btn" onClick={() => void newGame()} disabled={busy} style={newGameStyle}>
+                New game
+              </button>
             </div>
-            <button type="button" className="wyrd-btn" onClick={() => void newGame()} disabled={busy} style={newGameStyle}>
-              New game
-            </button>
-          </motion.div>
+          </div>
         )}
         {game !== null && !booting && (
           <div className="wyrd-board" style={boardStyle}>
@@ -354,24 +360,10 @@ const boardStyle: CSSProperties = { display: "flex", flexWrap: "wrap", gap: 24, 
 const mainStyle: CSSProperties = { flex: "999 1 620px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16, minHeight: 0 };
 const storyScrollStyle: CSSProperties = { display: "flex", flexDirection: "column", gap: 16, paddingRight: 4 };
 const pinnedBarStyle: CSSProperties = { flexShrink: 0, background: "#1A1421", borderTop: "1px solid #5A4A68", padding: 12, display: "flex", flexDirection: "column", gap: 12 };
+const bannerRowStyle: CSSProperties = { background: "#1A1421", padding: "14px 22px", display: "flex", justifyContent: "flex-end" };
 const newGameStyle: CSSProperties = { background: "#B44DFF", color: "#120E17", marginLeft: "auto" };
-const bannerSub: CSSProperties = { fontSize: 17, color: "#B9AEC0", fontStyle: "italic" };
+const newGameRow: CSSProperties = { display: "flex", justifyContent: "flex-end" };
 
-function bannerStyle(won: boolean): CSSProperties {
-  return {
-    background: "#1A1421",
-    borderLeft: won ? "6px solid #4DE8B5" : "6px solid #FF6B5B",
-    padding: "18px 22px",
-    display: "flex",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: 16,
-  };
-}
-
-function bannerTitle(won: boolean): CSSProperties {
-  return { fontSize: 34, color: won ? "#4DE8B5" : "#FF6B5B" };
-}
 
 
 
