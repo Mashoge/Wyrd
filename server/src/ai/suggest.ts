@@ -6,6 +6,7 @@ export interface Suggestion {
   kind: string;
   target?: number;
   isNew?: boolean;
+  usesConsumable?: boolean;
 }
 
 function dedupeKeepOrder(values: Suggestion[]): Suggestion[] {
@@ -20,6 +21,7 @@ function dedupeKeepOrder(values: Suggestion[]): Suggestion[] {
       kind: v.kind,
       ...(v.target === undefined ? {} : { target: v.target }),
       ...(v.isNew === true ? { isNew: true as const } : {}),
+      ...(v.usesConsumable === true ? { usesConsumable: true as const } : {}),
     });
   }
   return out;
@@ -224,7 +226,7 @@ export function suggestActions(view: PlayerView, world?: World, lastRoomId?: str
         ? hp <= view.player.maxHp - heal || hp * 2 <= view.player.maxHp
         : hp < view.player.maxHp;
     if (worthIt) {
-      out.push({ text: `Drink the ${inv.name}`, kind: "drink" });
+      out.push({ text: `Drink the ${inv.name}`, kind: "drink", usesConsumable: true });
     }
     break;
   }

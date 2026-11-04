@@ -90,11 +90,14 @@ function toSuggestions(value: unknown): Suggestion[] {
     const kind = s["kind"];
     const target = s["target"];
     const isNew = s["isNew"];
+    const usesConsumable = s["usesConsumable"];
     if (typeof text !== "string" || typeof kind !== "string") continue;
     if (target !== undefined && typeof target !== "number") continue;
     if (isNew !== undefined && typeof isNew !== "boolean") continue;
+    if (usesConsumable !== undefined && typeof usesConsumable !== "boolean") continue;
     const clean: Suggestion = target === undefined ? { text, kind } : { text, kind, target };
     if (isNew === true) clean.isNew = true;
+    if (usesConsumable === true) clean.usesConsumable = true;
     out.push(clean);
   }
   return out;

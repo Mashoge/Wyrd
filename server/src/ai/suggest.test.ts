@@ -244,6 +244,20 @@ describe("suggestActions", () => {
     expect(hasDrink(10)).toBe(false);
   });
 
+  it("marks only the drink chip as usesConsumable", () => {
+    const state = startGame(sunkenCrypt, "s1", seqRng([0, 0]), "suggest-salt");
+    state.hp = 5;
+    state.inventory.push("healing_draught");
+    const out = suggestActions(playerView(state, sunkenCrypt), sunkenCrypt);
+    const drink = out.find((s) => s.kind === "drink");
+    expect(drink).toBeDefined();
+    expect(drink?.usesConsumable).toBe(true);
+    for (const s of out) {
+      if (s === drink) continue;
+      expect(s.usesConsumable).toBeUndefined();
+    }
+  });
+
   it("offers no move chip in the ossuary while the Warden seals the only exit", () => {
     const state = startGame(sunkenCrypt, "s1", seqRng([0, 0]), "suggest-salt");
     state.currentRoomId = "ossuary";

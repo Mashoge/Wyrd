@@ -9,6 +9,7 @@ interface Props {
 const PLACEHOLDERS = [
   "What do you do?",
   "Try: sneak past and grab the key",
+  "Try: throw something to distract an enemy",
   "Try: ask what that sound is",
   "Try anything — even cheating. The rules will check.",
 ];

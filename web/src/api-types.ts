@@ -15,6 +15,8 @@ export interface PlayerViewExit { direction: string; locked: boolean; leadsTo?: 
 export interface PlayerViewEnemy {
   id: string; name: string; quirk: string; passed: boolean;
   defeated: boolean; condition: "unhurt" | "wounded" | "badly wounded" | "defeated";
+  distracted?: boolean;
+  enemyHp?: { hp: number; maxHp: number } | null;
 }
 export interface PlayerViewPlayer {
   hp: number; maxHp: number; inventory: PlayerViewItem[];
@@ -25,7 +27,7 @@ export interface PlayerView {
   room: PlayerViewRoom; exits: PlayerViewExit[]; items: PlayerViewItem[];
   enemy: PlayerViewEnemy | null; player: PlayerViewPlayer;
 }
-export interface Suggestion { text: string; kind: string; target?: number; isNew?: boolean }
+export interface Suggestion { text: string; kind: string; target?: number; isNew?: boolean; usesConsumable?: boolean }
 export interface GameMapRoom { id: string; name: string; isCurrent: boolean }
 export interface GameMapLink { from: string; to: string; direction: string }
 export interface GameMapStub { from: string; direction: string }
