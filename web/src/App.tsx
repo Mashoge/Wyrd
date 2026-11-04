@@ -15,6 +15,8 @@ import { TipQueue, detectTips, hasSeenIntro, type Tip } from "./guidance";
 import { IntroModal } from "./components/IntroModal";
 import { HelpPanel } from "./components/HelpPanel";
 import { TipCard } from "./components/TipCard";
+import { FirstVisitTracker } from "./key-moments";
+import { RoomTitleCard } from "./components/RoomTitleCard";
 
 const INSPECTOR_STORAGE_KEY = "wyrd.inspector";
 
@@ -77,6 +79,10 @@ export function App(): JSX.Element {
   const [tipQueue] = useState<TipQueue>(() => new TipQueue());
   const [currentTip, setCurrentTip] = useState<Tip | null>(null);
   const [guidanceTick, setGuidanceTick] = useState(0);
+  // Room title card: first-visit detection per game (seeded on load).
+  const firstVisitRef = useRef<FirstVisitTracker>(new FirstVisitTracker());
+  const roomCardSeq = useRef(0);
+  const [roomCard, setRoomCard] = useState<{ name: string; key: number } | null>(null);
   // Guidance: tip entries accumulate across turns; only successful turns add.
   const guidanceEntriesRef = useRef<ToolLogEntry[]>([]);
   // True while the first-view intro is up, so tips do not pop in behind it.
@@ -92,6 +98,14 @@ export function App(): JSX.Element {
 
   const applyGameData = useCallback(
     (g: { gameId: string; commitment: string; view: PlayerView; status: GameStatus; map?: GameMap }, fresh: boolean, narration: string | null, toolLog: ToolLogEntry[], sug: Suggestion[], meta: TurnMeta | null = null): void => {
+      // Seed first-visit tracking with every already-known room (the fresh
+      // start room, or the whole visited map on resume) so no card fires
+      // for a room the player is already standing in / has visited.
+      firstVisitRef.current.beginGame(g.gameId, (g.map?.rooms ?? []).map((r) => r.id));
+      if (!firstVisitRef.current.hasSeen(g.view.room.id)) {
+        firstVisitRef.current.observe(g.gameId, g.view.room.id);
+      }
+      setRoomCard(null);
       saveGameId(g.gameId);
       const resolved = resolveStoredCommitment(g.gameId, g.commitment);
       setGame((prev) => ({ gameId: g.gameId, commitment: g.commitment, storedCommitment: resolved.stored, sealMismatch: resolved.sealMismatch, verified: prev !== null && prev.gameId === g.gameId ? prev.verified : false, view: g.view, status: g.status, map: g.map ?? { rooms: [], links: [], unexplored: [] } }));
@@ -120,6 +134,18 @@ export function App(): JSX.Element {
     setCurrentTip(tipQueue.currentTip());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game, booting, introEverClosed, guidanceTick]);
+
+  // Room title card: fires once when the player enters a room they have
+  // not visited before in this game. A click anywhere skips it (below).
+  useEffect(() => {
+    if (game === null || booting) return;
+    if (firstVisitRef.current.observe(game.gameId, game.view.room.id)) {
+      roomCardSeq.current += 1;
+      setRoomCard({ name: game.view.room.name, key: roomCardSeq.current });
+    }
+  }, [game, booting]);
+
+  const dismissRoomCard = useCallback((): void => setRoomCard(null), []);
 
   const closeTip = useCallback((): void => {
     tipQueue.closeCurrent();
@@ -362,6 +388,7 @@ export function App(): JSX.Element {
   return AppLayout({
     game, turns, ledger, suggestions, busy, inspectorOn, booting, bootPhase, bootFresh, bootCommitment, bootSlow, error, over, won, storyScrollRef, onStoryScroll: handleStoryScroll, sendAction, retryTurn, retryBoot: boot, newGame, markVerified, onToggleInspector: toggleInspector,
     introOpen, helpOpen, currentTip, onCloseIntro: closeIntro, onOpenHelp: openHelp, onCloseHelp: closeHelp, onCloseTip: closeTip,
+    roomCard, onDismissRoomCard: dismissRoomCard,
   });
 }
 
@@ -394,10 +421,12 @@ interface LayoutArgs {
   onOpenHelp: () => void;
   onCloseHelp: () => void;
   onCloseTip: () => void;
+  roomCard: { name: string; key: number } | null;
+  onDismissRoomCard: () => void;
 }
 
 function AppLayout(args: LayoutArgs): JSX.Element {
-  const { game, turns, ledger, suggestions, busy, inspectorOn, booting, bootPhase, bootFresh, bootCommitment, bootSlow, error, over, won, storyScrollRef, onStoryScroll, sendAction, retryTurn, retryBoot, newGame, markVerified, onToggleInspector, introOpen, helpOpen, currentTip, onCloseIntro, onOpenHelp, onCloseHelp, onCloseTip } = args;
+  const { game, turns, ledger, suggestions, busy, inspectorOn, booting, bootPhase, bootFresh, bootCommitment, bootSlow, error, over, won, storyScrollRef, onStoryScroll, sendAction, retryTurn, retryBoot, newGame, markVerified, onToggleInspector, introOpen, helpOpen, currentTip, onCloseIntro, onOpenHelp, onCloseHelp, onCloseTip, roomCard, onDismissRoomCard } = args;
   const inspectorTurns: InspectorTurn[] = turns
     .filter((t) => !t.pending && !t.failed)
     .map((t) => ({ id: t.id, playerText: t.playerText, toolLog: t.toolLog, meta: t.meta ?? null }));
@@ -422,7 +451,16 @@ function AppLayout(args: LayoutArgs): JSX.Element {
         )}
         {game !== null && !booting && (
           <div className="wyrd-board">
-            <main className="wyrd-main">
+            <main
+              className="wyrd-main"
+              style={{ position: "relative" }}
+              onClick={roomCard !== null ? onDismissRoomCard : undefined}
+            >
+              <RoomTitleCard
+                roomName={roomCard?.name ?? null}
+                cardKey={roomCard?.key ?? 0}
+                onDone={onDismissRoomCard}
+              />
               <div
                 ref={storyScrollRef}
                 onScroll={onStoryScroll}

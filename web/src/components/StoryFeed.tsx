@@ -1,6 +1,10 @@
+import { useState } from "react";
 import type { JSX } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import type { ToolLogEntry, TurnMeta } from "../api";
+import { MUTED, refusalForTurn } from "../key-moments";
+import { DiceCutIn } from "./DiceCutIn";
+import { RefusedStamp } from "./RefusedStamp";
 import { RollRows } from "./RollRows";
 
 let turnSeq = 0;
@@ -37,23 +41,58 @@ interface Props {
 
 export function StoryFeed({ turns, onRetry }: Props): JSX.Element {
   const reduceMotion = useReducedMotion();
+  // A click anywhere in the feed skips running cut-in animations.
+  const [skipSignal, setSkipSignal] = useState(0);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+    <div
+      style={{ display: "flex", flexDirection: "column", gap: 18 }}
+      onClick={() => setSkipSignal((s) => s + 1)}
+    >
       {turns.map((t) => {
         const latest = t.id === turns[turns.length - 1]?.id;
         const rolls = t.toolLog.flatMap((e) => e.result.rolls);
+        const refusal = refusalForTurn(t.toolLog);
         return (
           <div key={t.id} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {t.playerText !== null && (
               <div
-                className="font-story"
                 style={{
-                  alignSelf: "flex-end", maxWidth: "70%", fontStyle: "italic",
-                  fontSize: 17, color: "#D9A6FF", textAlign: "right",
+                  position: "relative",
+                  alignSelf: "flex-end",
+                  maxWidth: "78%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
                 }}
               >
-                — {t.playerText}
+                <span
+                  className="font-story"
+                  style={{ fontStyle: "italic", fontSize: 17, color: "#D9A6FF", textAlign: "right" }}
+                >
+                  — {t.playerText}
+                </span>
+                {refusal !== null && <RefusedStamp refusal={refusal} skipSignal={skipSignal} />}
               </div>
+            )}
+            {t.playerText === null && refusal !== null && (
+              <div style={{ alignSelf: "flex-end" }}>
+                <RefusedStamp refusal={refusal} skipSignal={skipSignal} />
+              </div>
+            )}
+            {refusal !== null && (
+              <p
+                style={{
+                  margin: 0,
+                  alignSelf: "flex-end",
+                  fontFamily: "Inter, sans-serif",
+                  fontSize: 13,
+                  color: MUTED,
+                  textAlign: "right",
+                }}
+              >
+                {refusal.reason}
+                {refusal.count > 1 ? ` (${refusal.count} claims refused)` : ""}
+              </p>
             )}
             {t.pending ? (
               <article
@@ -83,7 +122,7 @@ export function StoryFeed({ turns, onRetry }: Props): JSX.Element {
               </article>
             ) : (
               <>
-                <RollRows rolls={rolls} />
+                {latest && !t.failed ? <DiceCutIn rolls={rolls} /> : <RollRows rolls={rolls} />}
                 {t.failed ? (
                   <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                     <span className="font-story" style={{ fontSize: 14, color: "#B9AEC0", fontStyle: "italic" }}>
