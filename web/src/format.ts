@@ -72,7 +72,7 @@ function hasFailedPlayerRoll(rolls: DiceRoll[]): boolean {
   return false;
 }
 
-/** Tool call → plain words for the Ledger of fate. */
+/** Tool call → plain words for the Action log. */
 export function toolToPlain(entry: ToolLogEntry): PlainToolCall {
   const accepted = entry.result.ok;
   const failed = accepted && hasFailedPlayerRoll(entry.result.rolls);

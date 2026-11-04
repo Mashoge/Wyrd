@@ -44,7 +44,7 @@ Living document: we refine it as we build. Concept mockups: V3 "Kinetic fate" on
 | Runes (decoration only) | **Noto Sans Runic** |
 | Code view (Inspector only) | System monospace |
 
-Narration 18–21px, line-height ~1.65, max ~66 characters per line. Use a violet drop cap on the latest narration.
+Narration 18–21px, line-height ~1.65, max ~66 characters per line. Mark the latest narration with a thin slanted violet bar on its left; older narration uses muted text.
 
 ## 4. Shapes and components
 
@@ -52,12 +52,12 @@ Narration 18–21px, line-height ~1.65, max ~66 characters per line. Use a viole
 - **Slanted blocks** (logo, dice number, buttons): `polygon(4–6% 0,100% 0,94–96% 100%,0 100%)`.
 - **Stamps:** outlined, uppercase Cinzel, rotated -4° to -12° (DEFEATED, REFUSED).
 - **Hearts** for HP (filled coral / outlined line color).
-- **Thread of fate** for the turn limit: a violet line that shortens, frayed at the end.
+- **Turns left** for the turn limit: a violet line that shortens, frayed at the end.
 - **Geometric seal** with a rune for "Fate sealed"; it cracks for "Fate verified".
 - **Rune border** as a faint divider under the header.
-- **Ledger of fate:** the player-facing action log in plain words ("Claimed a Legendary Sword → REFUSED"). The raw tool calls live in the Inspector for judges.
-- **Suggestions** are titled "Threads you could pull".
-- **Goal panel** is titled "Your wyrd".
+- **Action log:** the player-facing action log in plain words ("Claimed a Legendary Sword → REFUSED"). The raw tool calls live in the Inspector for judges.
+- **Suggestions** are titled "What you can do".
+- **Goal panel** is titled "Goal".
 
 ## 5. Motion and key moments
 
@@ -74,7 +74,7 @@ Narration 18–21px, line-height ~1.65, max ~66 characters per line. Use a viole
 ## 6. Layout
 
 - Left: story feed (player lines, dice result, narration), suggestions, input with mic and ACT button.
-- Right sidebar: enemy card (with Muse Image portrait), You (hearts, thread of fate, satchel), Ledger of fate, Your wyrd.
+- Right sidebar: enemy card (with Muse Image portrait), You (hearts, turns left, inventory), Action log, Goal.
 - Header: WYRD logo block, world title and goal, seal with fingerprint, Inspector toggle.
 - Works at phone width: the sidebar stacks under the story; buttons wrap.
 

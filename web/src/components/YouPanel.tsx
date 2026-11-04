@@ -34,10 +34,10 @@ export function YouPanel({ view }: { view: PlayerView }): JSX.Element {
         ))}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <div style={{ fontSize: 13, color: "#B9AEC0" }}>Thread of fate</div>
+        <div style={{ fontSize: 13, color: "#B9AEC0" }}>Turns left</div>
         <div style={{ fontSize: 13, color: "#B9AEC0" }}>{left} turns left</div>
       </div>
-      <svg viewBox="0 0 300 24" width="100%" height="24" role="img" aria-label={`Thread of fate, ${left} of ${view.player.maxTurns} turns left`}>
+      <svg viewBox="0 0 300 24" width="100%" height="24" role="img" aria-label={`Turns left, ${left} of ${view.player.maxTurns} turns left`}>
         <path
           d="M2 12 C40 6 70 18 110 12 S170 6 210 12"
           fill="none"
@@ -56,10 +56,10 @@ export function YouPanel({ view }: { view: PlayerView }): JSX.Element {
         <path d="M224 12 C250 10 270 14 298 12" fill="none" stroke="#3E3247" strokeWidth="2" strokeDasharray="3 5" />
       </svg>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        <div className="font-title" style={{ fontSize: 12, color: "#B9AEC0" }}>Satchel</div>
+        <div className="font-title" style={{ fontSize: 12, color: "#B9AEC0" }}>Inventory</div>
         {view.player.inventory.length === 0 ? (
           <div className="font-story" style={{ fontSize: 16, color: "#B9AEC0", fontStyle: "italic" }}>
-            Empty pockets, full nerves.
+            Nothing yet
           </div>
         ) : (
           <div className="font-story" style={{ fontSize: 17, lineHeight: 1.55 }}>

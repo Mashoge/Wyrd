@@ -298,8 +298,25 @@ describe("GAME_MASTER_PROMPT playtest rules", () => {
     expect(GAME_MASTER_PROMPT).toContain("pick_up for a claimed item");
     expect(GAME_MASTER_PROMPT).toContain("banter");
     expect(GAME_MASTER_PROMPT).toContain("Lost Relic");
-    expect(GAME_MASTER_PROMPT).toContain("2-4 sentences");
+    expect(GAME_MASTER_PROMPT).toContain("1-3 short sentences");
+    expect(GAME_MASTER_PROMPT).toContain("about 45 words");
+    expect(GAME_MASTER_PROMPT).toContain("Lead with what happened");
+    expect(GAME_MASTER_PROMPT).toContain("plain, simple English");
+    expect(GAME_MASTER_PROMPT).toContain("only on the first visit");
+    expect(GAME_MASTER_PROMPT).toContain("at most one vivid detail");
+    expect(GAME_MASTER_PROMPT).toContain("occasionally");
+    expect(GAME_MASTER_PROMPT).toContain("one or two plain sentences");
     expect(GAME_MASTER_PROMPT).toContain("quirk");
+    expect(GAME_MASTER_PROMPT).toContain("second person, present tense");
+    expect(GAME_MASTER_PROMPT).toContain("Prefer strong verbs over adjectives");
+    expect(GAME_MASTER_PROMPT).toContain("Never repeat numbers the player already sees");
+    expect(GAME_MASTER_PROMPT).toContain("Describe how it felt, not the math");
+    expect(GAME_MASTER_PROMPT).toContain("Narrate failures as carefully as successes");
+    expect(GAME_MASTER_PROMPT).toContain("never invent a consequence that is not in the events");
+    expect(GAME_MASTER_PROMPT).toContain("Save dramatic language for big moments");
+    expect(GAME_MASTER_PROMPT).toContain("Keep ordinary actions calm");
+    expect(GAME_MASTER_PROMPT).toContain("something the player did earlier");
+    expect(GAME_MASTER_PROMPT).toContain("except through omens given in the view");
   });
 
   it("locks the bare-handed, defeated-enemy and free look/examine rules", () => {

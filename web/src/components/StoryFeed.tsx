@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import type { ToolLogEntry } from "../api";
 import { RollRows } from "./RollRows";
 
@@ -15,6 +15,7 @@ interface Props {
 
 export function StoryFeed({ turns }: Props): JSX.Element {
   const last = turns.length - 1;
+  const reduceMotion = useReducedMotion();
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       {turns.map((t, i) => {
@@ -36,23 +37,35 @@ export function StoryFeed({ turns }: Props): JSX.Element {
             <RollRows rolls={rolls} />
             {latest ? (
               <motion.article
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.22 }}
+                key={`latest-${last}`}
+                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.2 }}
                 className="panel-cut"
                 style={{ background: "#1A1421", color: "#F4EFF6", padding: "28px 32px" }}
               >
-                <p
-                  className="font-story dropcap"
-                  style={{ margin: 0, fontSize: 21, lineHeight: 1.65, maxWidth: "62ch" }}
-                >
-                  {t.narration}
-                </p>
+                <div style={{ display: "flex", alignItems: "stretch", gap: 16 }}>
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      width: 4,
+                      flexShrink: 0,
+                      background: "#B44DFF",
+                      clipPath: "polygon(0 4%,100% 0,100% 96%,0 100%)",
+                    }}
+                  />
+                  <p
+                    className="font-story"
+                    style={{ margin: 0, fontSize: 21, lineHeight: 1.65, maxWidth: "62ch", color: "#F4EFF6" }}
+                  >
+                    {t.narration}
+                  </p>
+                </div>
               </motion.article>
             ) : (
               <p
                 className="font-story"
-                style={{ margin: 0, fontSize: 18, lineHeight: 1.7, color: "#A99E8A", maxWidth: "66ch" }}
+                style={{ margin: 0, fontSize: 18, lineHeight: 1.7, color: "#B9AEC0", maxWidth: "66ch" }}
               >
                 {t.narration}
               </p>

@@ -11,10 +11,7 @@ export function EnemyCard({ enemy }: { enemy: PlayerViewEnemy | null }): JSX.Ele
   if (enemy === null) {
     return (
       <section aria-label="Enemy" className="panel-cut" style={{ background: "#1A1421", padding: "18px 20px" }}>
-        <div className="font-title" style={{ fontSize: 18 }}>No foe near</div>
-        <div className="font-story" style={{ fontSize: 16, color: "#B9AEC0", fontStyle: "italic" }}>
-          The dark keeps its own counsel.
-        </div>
+        <div className="font-title" style={{ fontSize: 18 }}>No enemy here</div>
       </section>
     );
   }

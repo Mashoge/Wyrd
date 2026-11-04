@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { EnemyCard } from "./components/EnemyCard";
 import { Ledger } from "./components/Ledger";
+import { StoryFeed } from "./components/StoryFeed";
 import { Suggestions } from "./components/Suggestions";
 import type { PlayerViewEnemy, Suggestion, ToolLogEntry } from "./api";
 
@@ -61,5 +62,23 @@ describe("Ledger failed state", () => {
     expect(html).toContain("Missed the Goblin");
     expect(html).toContain("Failed");
     expect(html).not.toContain("Refused");
+  });
+});
+
+describe("StoryFeed latest narration", () => {
+  it("marks only the latest narration with the violet bar, no drop cap", () => {
+    const html = renderToStaticMarkup(
+      <StoryFeed
+        turns={[
+          { playerText: null, narration: "Old dark.", toolLog: [] },
+          { playerText: null, narration: "New light.", toolLog: [] },
+        ]}
+      />,
+    );
+    expect(html).not.toContain("dropcap");
+    expect(html).toContain("polygon(0 4%,100% 0,100% 96%,0 100%)");
+    expect(html).toContain("#B44DFF");
+    expect(html).toContain("#F4EFF6");
+    expect(html).toContain("#B9AEC0");
   });
 });

@@ -12,7 +12,7 @@ export function WyrdPanel({ inventory, status }: Props): JSX.Element {
   const escaped = status === "won";
   return (
     <section aria-label="Goal" className="panel-cut" style={{ background: "#1A1421", padding: "18px 20px", display: "flex", flexDirection: "column", gap: 8 }}>
-      <div className="font-title" style={{ fontSize: 18 }}>Your wyrd</div>
+      <div className="font-title" style={{ fontSize: 18 }}>Goal</div>
       <div className="font-story" style={{ fontSize: 17, lineHeight: 1.75 }}>
         <div>
           <span style={{ color: found ? "#4DE8B5" : "#5B4A66" }}>{found ? "✓" : "○"}</span>{" "}

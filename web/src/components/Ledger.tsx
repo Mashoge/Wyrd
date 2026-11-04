@@ -7,10 +7,10 @@ export function Ledger({ log }: { log: ToolLogEntry[] }): JSX.Element {
   const [showAll, setShowAll] = useState(false);
   const visible = showAll ? log : log.slice(-6);
   return (
-    <section aria-label="Ledger of fate" className="panel-cut" style={{ background: "#1A1421", padding: "18px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+    <section aria-label="Action log" className="panel-cut" style={{ background: "#1A1421", padding: "18px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <div className="font-title" style={{ fontSize: 18, whiteSpace: "nowrap" }}>Ledger of fate</div>
-        <div style={{ fontSize: 12, color: "#B9AEC0" }}>every claim is checked</div>
+        <div className="font-title" style={{ fontSize: 18, whiteSpace: "nowrap" }}>Action log</div>
+        <div style={{ fontSize: 12, color: "#B9AEC0" }}>Checked by code</div>
       </div>
       {log.length === 0 ? (
         <div className="font-story" style={{ fontSize: 16, color: "#B9AEC0", fontStyle: "italic" }}>
