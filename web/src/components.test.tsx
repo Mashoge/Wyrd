@@ -36,6 +36,25 @@ function failedAttack(): ToolLogEntry {
   };
 }
 
+describe("EnemyCard portrait", () => {
+  it("renders the static portrait for the enemy id, never placeholder text", () => {
+    const html = renderToStaticMarkup(<EnemyCard enemy={enemy()} />);
+    expect(html).toContain('src="/portraits/goblin.webp"');
+    expect(html).toContain('alt="Goblin"');
+    expect(html).toContain("object-fit:cover");
+    expect(html).not.toContain("[portrait]");
+  });
+
+  it("uses the enemy id for other enemies' portraits", () => {
+    const html = renderToStaticMarkup(
+      <EnemyCard enemy={enemy({ id: "bone_troll", name: "Bone Troll" })} />,
+    );
+    expect(html).toContain('src="/portraits/bone_troll.webp"');
+    expect(html).toContain('alt="Bone Troll"');
+    expect(html).not.toContain("[portrait]");
+  });
+});
+
 describe("EnemyCard progress line", () => {
   it("shows slipped-past text only when passed and living", () => {
     expect(renderToStaticMarkup(<EnemyCard enemy={enemy({ passed: true })} />)).toContain("You slipped past it");

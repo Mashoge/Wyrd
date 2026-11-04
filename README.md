@@ -28,6 +28,7 @@ Wyrd is a short fantasy adventure run by an AI game master, **Meta's Muse Spark*
 |---|---|
 | **Muse Spark 1.3** (Meta Model API) | The game master. Runs an agentic loop: reads a filtered player view, calls up to 9 game tools over multiple rounds (move, attack, sneak, throw, attempt, …), receives the engine's results, then narrates only what actually happened |
 | **Muse Voice Transcribe 1.0** (Meta Model API) | Voice input. The browser records and encodes 16 kHz WAV; the server forwards it, so the API key never reaches the browser. English and Tagalog |
+| **Muse Image** (Meta Model API) | Enemy portraits, generated once by scripts/gen-portraits.mjs and served as small WebP files |
 | **Muse Wonder 1.0 and Muse Spark** (developer tooling) | Used as the coding model (through the Cline agent) to build much of this project during the hackathon |
 
 ## How it works

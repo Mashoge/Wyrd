@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import { useState, type JSX } from "react";
 import type { PlayerViewEnemy } from "../api";
 import { hearts } from "../format";
 
@@ -22,6 +22,10 @@ function EnemyHeart({ filled }: { filled: boolean }): JSX.Element {
 }
 
 export function EnemyCard({ enemy }: { enemy: PlayerViewEnemy | null }): JSX.Element {
+  // Portraits are generated once (scripts/gen-portraits.mjs) and served from
+  // /portraits/<enemy id>.webp. If one fails to load, hide its box entirely.
+  // Keyed by enemy id so a different enemy gets a fresh attempt.
+  const [failedPortraitId, setFailedPortraitId] = useState<string | null>(null);
   if (enemy === null) {
     return (
       <section aria-label="Enemy" className="panel-cut" style={{ background: "#1A1421", padding: "18px 20px" }}>
@@ -38,9 +42,16 @@ export function EnemyCard({ enemy }: { enemy: PlayerViewEnemy | null }): JSX.Ele
           {stamp.text}
         </span>
       </div>
-      <div className="panel-cut" style={{ height: 140, background: "#241B2D", display: "flex", alignItems: "center", justifyContent: "center", color: "#9C8FA6", fontSize: 13 }}>
-        [portrait]
-      </div>
+      {failedPortraitId !== enemy.id && (
+        <div className="panel-cut" style={{ height: 140, background: "#241B2D", overflow: "hidden" }}>
+          <img
+            src={`/portraits/${enemy.id}.webp`}
+            alt={enemy.name}
+            onError={() => setFailedPortraitId(enemy.id)}
+            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          />
+        </div>
+      )}
       <div className="font-story" style={{ fontSize: 16, color: "#B9AEC0", fontStyle: "italic" }}>
         {enemy.quirk.endsWith(".") ? enemy.quirk : `${enemy.quirk}.`}
       </div>
