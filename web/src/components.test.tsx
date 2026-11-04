@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { EnemyCard } from "./components/EnemyCard";
 import { Ledger } from "./components/Ledger";
+import { BootScreen } from "./components/BootScreen";
 import { StoryFeed } from "./components/StoryFeed";
 import { Suggestions } from "./components/Suggestions";
 import type { PlayerViewEnemy, Suggestion, ToolLogEntry } from "./api";
@@ -69,9 +70,10 @@ describe("StoryFeed latest narration", () => {
   it("marks only the latest narration with the violet bar, no drop cap", () => {
     const html = renderToStaticMarkup(
       <StoryFeed
+        onRetry={() => {}}
         turns={[
-          { playerText: null, narration: "Old dark.", toolLog: [] },
-          { playerText: null, narration: "New light.", toolLog: [] },
+          { id: "a", playerText: null, narration: "Old dark.", toolLog: [] },
+          { id: "b", playerText: null, narration: "New light.", toolLog: [] },
         ]}
       />,
     );
@@ -80,5 +82,81 @@ describe("StoryFeed latest narration", () => {
     expect(html).toContain("#B44DFF");
     expect(html).toContain("#F4EFF6");
     expect(html).toContain("#B9AEC0");
+  });
+
+  it("shows the player line plus a pending placeholder", () => {
+    const html = renderToStaticMarkup(
+      <StoryFeed
+        onRetry={() => {}}
+        turns={[{ id: "p1", playerText: "Go north", narration: "", toolLog: [], pending: true }]}
+      />,
+    );
+    expect(html).toContain("— Go north");
+    expect(html).toContain("The game master is deciding");
+    expect(html).toContain("#B44DFF");
+  });
+
+  it("shows one inline retry for a failed turn", () => {
+    const html = renderToStaticMarkup(
+      <StoryFeed
+        onRetry={() => {}}
+        turns={[{ id: "f1", playerText: "Go north", narration: "", toolLog: [], failed: true }]}
+      />,
+    );
+    expect(html).toContain("— Go north");
+    expect(html).toContain("Try again");
+    expect(html).toContain("<button");
+    expect(html).not.toContain("The game master is deciding");
+  });
+});
+
+describe("BootScreen", () => {
+  it("shows the sealing line and rune border while loading a fresh game", () => {
+    const html = renderToStaticMarkup(
+      <BootScreen phase="loading" isFresh={true} commitment={null} showSlowHint={false} onRetry={() => {}} />,
+    );
+    expect(html).toContain("Sealing the relic and the trap");
+    expect(html).toContain("Wyrd");
+    expect(html).toContain("ᚹ");
+    expect(html).not.toContain("#4DE8B5");
+  });
+
+  it("shows the returning line on resume", () => {
+    const html = renderToStaticMarkup(
+      <BootScreen phase="loading" isFresh={false} commitment={null} showSlowHint={false} onRetry={() => {}} />,
+    );
+    expect(html).toContain("Returning to the crypt");
+    expect(html).not.toContain("Sealing the relic");
+  });
+
+  it("shows the slow hint when the crypt takes a while", () => {
+    const html = renderToStaticMarkup(
+      <BootScreen phase="loading" isFresh={true} commitment={null} showSlowHint={true} onRetry={() => {}} />,
+    );
+    expect(html).toContain("Waking the crypt");
+  });
+
+  it("shows Fate sealed with the real short commitment", () => {
+    const html = renderToStaticMarkup(
+      <BootScreen
+        phase="sealed"
+        isFresh={true}
+        commitment="5666eaXXXX7b36e"
+        showSlowHint={false}
+        onRetry={() => {}}
+      />,
+    );
+    expect(html).toContain("Fate sealed");
+    expect(html).toContain("5666ea…7b36e");
+    expect(html).not.toContain("#4DE8B5");
+  });
+
+  it("shows a retry button on error", () => {
+    const html = renderToStaticMarkup(
+      <BootScreen phase="error" isFresh={true} commitment={null} showSlowHint={false} onRetry={() => {}} />,
+    );
+    expect(html).toContain("Couldn");
+    expect(html).toContain("<button");
+    expect(html).toContain("Try again");
   });
 });

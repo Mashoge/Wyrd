@@ -133,7 +133,6 @@ body {
 
 .wyrd-chip:hover:not(:disabled),
 .wyrd-chip:focus-visible:not(:disabled) {
-  transform: translateX(4px);
   color: #120E17;
 }
 
@@ -143,7 +142,7 @@ body {
 }
 
 .wyrd-chip:active:not(:disabled) {
-  transform: translateX(4px) scale(0.97);
+  transform: scale(0.97);
 }
 
 .wyrd-chip-text {
@@ -153,6 +152,12 @@ body {
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
+  transition: transform 180ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.wyrd-chip:hover:not(:disabled) .wyrd-chip-text,
+.wyrd-chip:focus-visible:not(:disabled) .wyrd-chip-text {
+  transform: translateX(4px);
 }
 
 .wyrd-chip-kind {
@@ -181,12 +186,14 @@ body {
   position: relative;
   z-index: 1;
   display: inline-block;
-  margin-left: 0;
-  max-width: 0;
+  flex: none;
+  width: 16px;
+  max-width: 16px;
+  margin-left: 8px;
   overflow: hidden;
   opacity: 0;
-  transform: translateX(-6px);
-  transition: opacity 180ms ease, transform 180ms cubic-bezier(0.175, 0.885, 0.32, 1.275), max-width 180ms cubic-bezier(0.175, 0.885, 0.32, 1.275), margin-left 180ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transform: translateX(-4px);
+  transition: opacity 180ms ease, transform 180ms cubic-bezier(0.175, 0.885, 0.32, 1.275);
   color: #120E17;
   font-size: 18px;
   line-height: 1;
@@ -196,8 +203,6 @@ body {
 .wyrd-chip:focus-visible:not(:disabled) .wyrd-chip-arrow {
   opacity: 1;
   transform: translateX(0);
-  margin-left: 8px;
-  max-width: 16px;
 }
 
 .wyrd-chip:disabled {
@@ -238,12 +243,14 @@ body {
   .wyrd-chip:focus-visible:not(:disabled) .wyrd-chip-arrow {
     color: #120E17;
   }
+  .wyrd-chip:hover:not(:disabled) .wyrd-chip-text,
+  .wyrd-chip:focus-visible:not(:disabled) .wyrd-chip-text {
+    transform: none;
+  }
   .wyrd-chip:hover:not(:disabled) .wyrd-chip-arrow,
   .wyrd-chip:focus-visible:not(:disabled) .wyrd-chip-arrow {
     transform: none;
     opacity: 1;
-    margin-left: 8px;
-    max-width: 16px;
   }
   .wyrd-chip:active:not(:disabled) {
     transform: none;
@@ -272,9 +279,159 @@ body {
   background: #3a2848;
 }
 
-@media (min-width: 901px) {
+@media (min-width: 1024px) {
+  html, body {
+    height: 100%;
+  }
+  body {
+    overflow: hidden;
+  }
+  .wyrd-app {
+    height: 100dvh;
+    overflow: hidden;
+  }
+  .wyrd-app-inner {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding-bottom: 24px;
+  }
+  .wyrd-board {
+    flex: 1;
+    min-height: 0;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    overflow: hidden;
+  }
+  .wyrd-main {
+    min-height: 0;
+    overflow: hidden;
+  }
+  .wyrd-story-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #5A4A68 transparent;
+  }
+  .wyrd-story-scroll::-webkit-scrollbar {
+    width: 8px;
+  }
+  .wyrd-story-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .wyrd-story-scroll::-webkit-scrollbar-thumb {
+    background: #5A4A68;
+  }
   .wyrd-sidebar {
-    position: sticky;
-    top: 16px;
+    position: static;
+    min-height: 0;
+    overflow-y: auto;
+    flex: 1 1 340px;
+    scrollbar-width: thin;
+    scrollbar-color: #5A4A68 transparent;
+  }
+  .wyrd-sidebar::-webkit-scrollbar {
+    width: 8px;
+  }
+  .wyrd-sidebar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .wyrd-sidebar::-webkit-scrollbar-thumb {
+    background: #5A4A68;
+  }
+}
+
+@media (max-width: 1023.98px) {
+  .wyrd-board {
+    flex-direction: column;
+  }
+}
+
+/* Sealing screen: geometric seal draw + rune fade (subtle loop). */
+.wyrd-seal-ring {
+  stroke-dasharray: 140;
+  stroke-dashoffset: 140;
+  animation: wyrd-seal-draw 2.2s ease-in-out infinite;
+}
+
+.wyrd-seal-rune {
+  opacity: 0;
+  animation: wyrd-rune-fade 2.2s ease-in-out infinite;
+}
+
+.wyrd-seal-settled {
+  animation: wyrd-seal-settle 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+@keyframes wyrd-seal-draw {
+  0% {
+    stroke-dashoffset: 140;
+  }
+  60% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes wyrd-rune-fade {
+  0% {
+    opacity: 0;
+  }
+  45% {
+    opacity: 0;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes wyrd-seal-settle {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(0.94);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Pending narration: gentle pulse on the violet bar only. */
+.wyrd-pending-bar {
+  animation: wyrd-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes wyrd-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wyrd-seal-ring,
+  .wyrd-seal-rune,
+  .wyrd-seal-settled,
+  .wyrd-pending-bar {
+    animation: none;
+  }
+  .wyrd-seal-ring {
+    stroke-dashoffset: 0;
+  }
+  .wyrd-seal-rune {
+    opacity: 1;
   }
 }
