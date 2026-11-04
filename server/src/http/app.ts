@@ -13,6 +13,7 @@ import { lossTip } from "../game/tips.js";
 import type { GameStatus, Rng } from "../game/types.js";
 import { sunkenCrypt } from "../game/worlds/sunkenCrypt.js";
 import { SessionStore } from "./sessions.js";
+import { buildMap } from "./map.js";
 
 export interface AppDeps {
   store: SessionStore;
@@ -130,7 +131,8 @@ export function createApp(deps: AppDeps): Express {
         toolLog: result.toolLog,
         view: result.view,
         status: result.status,
-        suggestions: suggestActions(result.view, sunkenCrypt),
+        suggestions: suggestActions(result.view, sunkenCrypt, state.lastRoomId),
+        map: buildMap(state, sunkenCrypt),
       });
     } catch {
       const look = executeTool(state, sunkenCrypt, "look", "{}", rng);
@@ -151,7 +153,8 @@ export function createApp(deps: AppDeps): Express {
         toolLog: [],
         view,
         status,
-        suggestions: suggestActions(view, sunkenCrypt),
+        suggestions: suggestActions(view, sunkenCrypt, state.lastRoomId),
+        map: buildMap(state, sunkenCrypt),
       });
     } finally {
       entry.busy = false;
@@ -198,7 +201,8 @@ export function createApp(deps: AppDeps): Express {
         toolLog: result.toolLog,
         view: result.view,
         status: result.status,
-        suggestions: suggestActions(result.view, entry.session.world),
+        suggestions: suggestActions(result.view, entry.session.world, entry.session.state.lastRoomId),
+        map: buildMap(entry.session.state, entry.session.world),
       });
     } catch {
       sendErr(res, 502, "The game master is unavailable, try again.");
@@ -222,9 +226,10 @@ export function createApp(deps: AppDeps): Express {
       commitment: state.commitment,
       view: resumeView,
       status: state.status,
-      suggestions: suggestActions(resumeView, world),
+      suggestions: suggestActions(resumeView, world, state.lastRoomId),
       openingNarration: entry.openingNarration ?? "",
       openingToolLog: entry.openingToolLog ?? [],
+      map: buildMap(state, world),
     });
   });
 

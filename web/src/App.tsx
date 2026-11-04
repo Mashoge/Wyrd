@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, JSX, RefObject } from "react";
 import { motion } from "framer-motion";
 import { ApiError, bootGame, clearGameId, createGame, loadGameId, playTurn, saveGameId } from "./api";
-import type { GameStatus, PlayerView, Suggestion, ToolLogEntry } from "./api";
+import type { GameMap, GameStatus, PlayerView, Suggestion, ToolLogEntry } from "./api";
 import { ActionForm } from "./components/ActionForm";
 import { Header } from "./components/Header";
 import { Sidebar } from "./components/Sidebar";
@@ -15,6 +15,7 @@ interface LoadedGame {
   commitment: string;
   view: PlayerView;
   status: GameStatus;
+  map: GameMap;
 }
 
 export function openingTurn(narration: string, toolLog: ToolLogEntry[]): Turn {
@@ -47,13 +48,14 @@ export function App(): JSX.Element {
   const gameRef = useRef<LoadedGame | null>(null);
   const storyScrollRef = useRef<HTMLDivElement | null>(null);
   const stickRef = useRef(true);
+  const forceScrollRef = useRef(false);
   const bootSeq = useRef(0);
   gameRef.current = game;
 
   const applyGameData = useCallback(
-    (g: { gameId: string; commitment: string; view: PlayerView; status: GameStatus }, fresh: boolean, narration: string | null, toolLog: ToolLogEntry[], sug: Suggestion[]): void => {
+    (g: { gameId: string; commitment: string; view: PlayerView; status: GameStatus; map?: GameMap }, fresh: boolean, narration: string | null, toolLog: ToolLogEntry[], sug: Suggestion[]): void => {
       saveGameId(g.gameId);
-      setGame({ gameId: g.gameId, commitment: g.commitment, view: g.view, status: g.status });
+      setGame({ gameId: g.gameId, commitment: g.commitment, view: g.view, status: g.status, map: g.map ?? { rooms: [], links: [], unexplored: [] } });
       if (fresh && narration !== null) {
         setTurns([freshTurn(null, narration, toolLog)]);
       } else if (!fresh && narration !== null) {
@@ -139,6 +141,17 @@ export function App(): JSX.Element {
   }, [boot]);
 
   useEffect(() => {
+    if (forceScrollRef.current) {
+      forceScrollRef.current = false;
+      const el = storyScrollRef.current;
+      if (el !== null) {
+        el.scrollTo({ top: el.scrollHeight, behavior: "auto" });
+      } else if (typeof window !== "undefined") {
+        window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "auto" });
+      }
+      stickRef.current = true;
+      return;
+    }
     const el = storyScrollRef.current;
     if (el === null) return;
     const desktop =
@@ -153,6 +166,7 @@ export function App(): JSX.Element {
       el.scrollTo({ top: el.scrollHeight, behavior: reduced ? "auto" : "smooth" });
       return;
     }
+    if (!stickRef.current) return;
     const reduced =
       typeof window !== "undefined" &&
       typeof window.matchMedia === "function" &&
@@ -174,6 +188,9 @@ export function App(): JSX.Element {
     busyRef.current = true;
     setBusy(true);
     const pendingId = createTurnId();
+    // Player action: always jump to the bottom even if they had scrolled up.
+    stickRef.current = true;
+    forceScrollRef.current = true;
     // Optimistic: player line + pending placeholder right away, same style.
     setTurns((prev) => [...prev, { id: pendingId, playerText: clean, narration: "", toolLog: [], pending: true }]);
     const gameId = current.gameId;
@@ -187,7 +204,7 @@ export function App(): JSX.Element {
       );
       setLedger((prev) => [...prev, ...res.toolLog]);
       setSuggestions(res.suggestions);
-      setGame((prev) => (prev === null ? prev : { ...prev, view: res.view, status: res.status }));
+      setGame((prev) => (prev === null ? prev : { ...prev, view: res.view, status: res.status, map: res.map }));
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {
         // Expired or missing game only: fall back to a fresh game; keep global handling.
@@ -321,7 +338,7 @@ function AppLayout(args: LayoutArgs): JSX.Element {
                 </div>
               )}
             </main>
-            <Sidebar view={game.view} status={game.status} ledger={ledger} />
+            <Sidebar view={game.view} status={game.status} ledger={ledger} map={game.map} />
           </div>
         )}
       </div>

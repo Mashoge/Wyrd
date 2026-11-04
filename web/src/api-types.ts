@@ -25,17 +25,21 @@ export interface PlayerView {
   room: PlayerViewRoom; exits: PlayerViewExit[]; items: PlayerViewItem[];
   enemy: PlayerViewEnemy | null; player: PlayerViewPlayer;
 }
-export interface Suggestion { text: string; kind: string; target?: number }
+export interface Suggestion { text: string; kind: string; target?: number; isNew?: boolean }
+export interface GameMapRoom { id: string; name: string; isCurrent: boolean }
+export interface GameMapLink { from: string; to: string; direction: string }
+export interface GameMapStub { from: string; direction: string }
+export interface GameMap { rooms: GameMapRoom[]; links: GameMapLink[]; unexplored: GameMapStub[] }
 export interface NewGameResponse {
   gameId: string; commitment: string; narration: string;
-  toolLog: ToolLogEntry[]; view: PlayerView; status: GameStatus; suggestions: Suggestion[];
+  toolLog: ToolLogEntry[]; view: PlayerView; status: GameStatus; suggestions: Suggestion[]; map: GameMap;
 }
 export interface TurnResponse {
   narration: string; toolLog: ToolLogEntry[];
-  view: PlayerView; status: GameStatus; suggestions: Suggestion[];
+  view: PlayerView; status: GameStatus; suggestions: Suggestion[]; map: GameMap;
 }
 export interface ResumeResponse {
   gameId: string; commitment: string;
   view: PlayerView; status: GameStatus; suggestions: Suggestion[];
-  openingNarration: string; openingToolLog: ToolLogEntry[];
+  openingNarration: string; openingToolLog: ToolLogEntry[]; map: GameMap;
 }

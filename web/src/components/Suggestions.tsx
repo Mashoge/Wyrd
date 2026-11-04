@@ -29,6 +29,21 @@ export function Suggestions({ suggestions, disabled, onPick }: Props): JSX.Eleme
               <span className="wyrd-chip-text">
                 <span className="wyrd-chip-kind">
                   {s.kind}
+                  {s.isNew === true ? (
+                    <span
+                      style={{
+                        background: "#3A2848",
+                        color: "#E8CCFF",
+                        fontSize: 10,
+                        fontWeight: 600,
+                        padding: "2px 6px",
+                        marginLeft: 6,
+                        clipPath: "polygon(8% 0,100% 0,92% 100%,0 100%)",
+                      }}
+                    >
+                      NEW
+                    </span>
+                  ) : null}
                 </span>
                 <span className="wyrd-chip-action">
                   {s.text}

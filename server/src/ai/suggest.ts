@@ -5,6 +5,7 @@ export interface Suggestion {
   text: string;
   kind: string;
   target?: number;
+  isNew?: boolean;
 }
 
 function dedupeKeepOrder(values: Suggestion[]): Suggestion[] {
@@ -14,7 +15,12 @@ function dedupeKeepOrder(values: Suggestion[]): Suggestion[] {
     const key = v.text.trim().toLowerCase();
     if (key.length === 0 || seen.has(key)) continue;
     seen.add(key);
-    out.push({ text: v.text.trim(), kind: v.kind, ...(v.target === undefined ? {} : { target: v.target }) });
+    out.push({
+      text: v.text.trim(),
+      kind: v.kind,
+      ...(v.target === undefined ? {} : { target: v.target }),
+      ...(v.isNew === true ? { isNew: true as const } : {}),
+    });
   }
   return out;
 }
@@ -83,11 +89,42 @@ function exitLabel(
  * Suggest 2-4 short, valid, plain-English actions built only from what is
  * visible in the player view. Never mentions secrets, unvisited rooms, or
  * anything not present in `view`. Deterministic so tests can lock it.
+ *
+ * `lastRoomId` (from state, never shown to the AI) lets the server label the
+ * exit that leads back. `world` is only used for safe labels/targets.
  */
-export function suggestActions(view: PlayerView, world?: World): Suggestion[] {
+export function suggestActions(view: PlayerView, world?: World, lastRoomId?: string | null): Suggestion[] {
   if (view.player.status !== "playing") return [];
 
   const out: Suggestion[] = [];
+
+  // Direction back to the room we came from, resolved from the real layout
+  // (view alone has no room ids). Empty when unknown or not visible.
+  let backDirection: string | null = null;
+  if (world !== undefined && typeof lastRoomId === "string" && lastRoomId.length > 0) {
+    const current = world.rooms[view.room.id];
+    if (current !== undefined) {
+      const back = current.exits.find((e) => e.to === lastRoomId);
+      if (back !== undefined && view.exits.some((e) => e.direction === back.direction)) {
+        backDirection = back.direction;
+      }
+    }
+  }
+
+  const moveText = (
+    exit: { direction: string; leadsTo?: string; omen?: string; unlocked?: boolean },
+  ): { text: string; isNew: boolean } => {
+    const isNew = exit.leadsTo === undefined;
+    if (backDirection !== null && exit.direction === backDirection && exit.leadsTo !== undefined) {
+      return { text: `Go back ${exit.direction} to ${exit.leadsTo}`, isNew: false };
+    }
+    return { text: exitLabel(exit.direction, exit.leadsTo, exit.omen, exit.unlocked), isNew };
+  };
+
+  const pushMove = (exit: { direction: string; leadsTo?: string; omen?: string; unlocked?: boolean }): void => {
+    const { text, isNew } = moveText(exit);
+    out.push(isNew ? { text, kind: "move", isNew: true } : { text, kind: "move" });
+  };
 
   // Highest priority: unlock a visible locked door with a key we hold.
   const lockedExits = view.exits.filter((e) => e.locked);
@@ -120,6 +157,24 @@ export function suggestActions(view: PlayerView, world?: World): Suggestion[] {
     });
   }
 
+  // Combo: sneak AND grab in one breath when both are live. Placed before
+  // the single pickups so it survives the cap of 4.
+  const awakeEnemy = livingEnemy !== null && !livingEnemy.passed ? livingEnemy : null;
+  if (awakeEnemy !== null && view.items.length > 0) {
+    const first = view.items[0];
+    if (first !== undefined) {
+      let combo = `Sneak past the ${awakeEnemy.name} and grab the ${first.name}`;
+      if (combo.length > 60) {
+        const room = 60 - `Sneak past the  and grab the `.length;
+        const half = Math.max(1, Math.floor(room / 2));
+        const enemyBit = awakeEnemy.name.slice(0, half).trim();
+        const itemBit = first.name.slice(0, Math.max(1, room - enemyBit.length)).trim();
+        combo = `Sneak past the ${enemyBit} and grab the ${itemBit}`.slice(0, 60);
+      }
+      out.push({ text: combo, kind: "combo" });
+    }
+  }
+
   // Pick up what is on the ground here.
   for (const item of view.items) {
     const target = pickUpTarget(view, world);
@@ -133,10 +188,7 @@ export function suggestActions(view: PlayerView, world?: World): Suggestion[] {
   // Move through open exits first.
   for (const exit of view.exits) {
     if (!exit.locked) {
-      out.push({
-        text: exitLabel(exit.direction, exit.leadsTo, exit.omen, exit.unlocked),
-        kind: "move",
-      });
+      pushMove(exit);
     }
   }
 
@@ -159,10 +211,7 @@ export function suggestActions(view: PlayerView, world?: World): Suggestion[] {
   // Locked exits last: still a valid thing to try, lowest priority.
   for (const exit of view.exits) {
     if (exit.locked) {
-      out.push({
-        text: exitLabel(exit.direction, exit.leadsTo, exit.omen, exit.unlocked),
-        kind: "move",
-      });
+      pushMove(exit);
     }
   }
 

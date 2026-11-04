@@ -168,6 +168,39 @@ describe("suggestActions", () => {
     expect(suggestActions(lost, sunkenCrypt)).toEqual([]);
   });
 
+  it("labels the way back and flags new exits without leaking names", () => {
+    const state = startGame(sunkenCrypt, "s1", seqRng([0, 0]), "suggest-salt");
+    state.currentRoomId = "hall";
+    state.visitedRoomIds.push("hall");
+    state.lastRoomId = "entrance";
+    const view = playerView(state, sunkenCrypt);
+    // hall south -> entrance (visited) is the way back; east is unvisited.
+    const out = suggestActions(view, sunkenCrypt, state.lastRoomId);
+    expect(texts(out)).toContain("Go back south to Crypt Entrance");
+    const east = out.find((s) => s.text.toLowerCase().includes("east"));
+    expect(east?.isNew).toBe(true);
+    expect(east?.text).toContain("low chanting drifts from the east");
+    const back = out.find((s) => s.text.startsWith("Go back"));
+    expect(back?.isNew).toBeUndefined();
+    expect(out.length).toBeLessThanOrEqual(4);
+    // Deterministic with lastRoomId.
+    expect(suggestActions(view, sunkenCrypt, state.lastRoomId)).toEqual(out);
+  });
+
+  it("offers a sneak-and-grab combo when both are live, within the cap", () => {
+    const state = startGame(sunkenCrypt, "s1", seqRng([0, 0]), "suggest-salt");
+    state.currentRoomId = "goblin_den";
+    const view = playerView(state, sunkenCrypt);
+    expect(view.enemy !== null && !view.enemy.defeated && !view.enemy.passed).toBe(true);
+    expect(view.items.length).toBeGreaterThan(0);
+    const out = suggestActions(view, sunkenCrypt, state.lastRoomId);
+    const combo = out.find((s) => s.kind === "combo");
+    expect(combo).toBeDefined();
+    expect(combo?.text).toBe("Sneak past the Goblin and grab the Silver Coin");
+    expect(combo?.target).toBeUndefined();
+    expect(out.length).toBeLessThanOrEqual(4);
+  });
+
   it("keeps working when exits carry omens", () => {
     const state = startGame(sunkenCrypt, "s1", seqRng([0, 0]), "suggest-salt");
     state.currentRoomId = "hall";

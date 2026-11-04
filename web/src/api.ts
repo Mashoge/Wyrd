@@ -1,4 +1,4 @@
-import type { DiceRoll, NewGameResponse, PlayerView, ResumeResponse, Suggestion } from "./api-types";
+import type { DiceRoll, GameMap, NewGameResponse, PlayerView, ResumeResponse, Suggestion } from "./api-types";
 import type { ToolLogEntry, ToolResult, TurnResponse } from "./api-types";
 import { ApiError, apiBaseUrl, clearGameId } from "./api-base";
 import { loadGameId, saveGameId } from "./api-base";
@@ -6,6 +6,10 @@ import { toPlayerView } from "./api-view";
 
 export type {
   DiceRoll,
+  GameMap,
+  GameMapLink,
+  GameMapRoom,
+  GameMapStub,
   GameStatus,
   NewGameResponse,
   PlayerView,
@@ -85,11 +89,45 @@ function toSuggestions(value: unknown): Suggestion[] {
     const text = s["text"];
     const kind = s["kind"];
     const target = s["target"];
+    const isNew = s["isNew"];
     if (typeof text !== "string" || typeof kind !== "string") continue;
     if (target !== undefined && typeof target !== "number") continue;
-    out.push(target === undefined ? { text, kind } : { text, kind, target });
+    if (isNew !== undefined && typeof isNew !== "boolean") continue;
+    const clean: Suggestion = target === undefined ? { text, kind } : { text, kind, target };
+    if (isNew === true) clean.isNew = true;
+    out.push(clean);
   }
   return out;
+}
+
+function toGameMap(value: unknown): GameMap {
+  const empty: GameMap = { rooms: [], links: [], unexplored: [] };
+  if (!isRecord(value)) return empty;
+  const rooms: GameMap["rooms"] = [];
+  const links: GameMap["links"] = [];
+  const unexplored: GameMap["unexplored"] = [];
+  if (Array.isArray(value["rooms"])) {
+    for (const r of value["rooms"]) {
+      if (!isRecord(r)) continue;
+      if (typeof r["id"] !== "string" || typeof r["name"] !== "string" || typeof r["isCurrent"] !== "boolean") continue;
+      rooms.push({ id: r["id"], name: r["name"], isCurrent: r["isCurrent"] });
+    }
+  }
+  if (Array.isArray(value["links"])) {
+    for (const l of value["links"]) {
+      if (!isRecord(l)) continue;
+      if (typeof l["from"] !== "string" || typeof l["to"] !== "string" || typeof l["direction"] !== "string") continue;
+      links.push({ from: l["from"], to: l["to"], direction: l["direction"] });
+    }
+  }
+  if (Array.isArray(value["unexplored"])) {
+    for (const u of value["unexplored"]) {
+      if (!isRecord(u)) continue;
+      if (typeof u["from"] !== "string" || typeof u["direction"] !== "string") continue;
+      unexplored.push({ from: u["from"], direction: u["direction"] });
+    }
+  }
+  return { rooms, links, unexplored };
 }
 
 async function parseBody(res: Response): Promise<Record<string, unknown>> {
@@ -170,6 +208,7 @@ export async function createGame(): Promise<NewGameResponse> {
     view,
     status: toStatus(body["status"]),
     suggestions: toSuggestions(body["suggestions"]),
+    map: toGameMap(body["map"]),
   };
 }
 
@@ -184,6 +223,7 @@ export async function playTurn(gameId: string, text: string): Promise<TurnRespon
     view,
     status: toStatus(body["status"]),
     suggestions: toSuggestions(body["suggestions"]),
+    map: toGameMap(body["map"]),
   };
 }
 
@@ -201,6 +241,7 @@ export async function fetchGame(gameId: string): Promise<ResumeResponse> {
     suggestions: toSuggestions(body["suggestions"]),
     openingNarration: body["openingNarration"],
     openingToolLog: toToolLog(body["openingToolLog"]),
+    map: toGameMap(body["map"]),
   };
 }
 

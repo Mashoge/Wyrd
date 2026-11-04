@@ -166,6 +166,70 @@ describe("health + game lifecycle", () => {
     }
     deps.store.stop();
   });
+
+  it("map field shows visited rooms + unexplored stubs, never secrets", async () => {
+    const client = new FakeClient();
+    client.script = [{ content: "Opening." }, { content: "You wait." }];
+    const deps = makeDeps(client, { ms: 0 });
+    const app = createApp(deps);
+    const created = await request(app).post("/api/games");
+    expect(created.status).toBe(201);
+    const gameId = created.body.gameId as string;
+    const entry = deps.store.get(gameId);
+    if (entry === undefined) throw new Error("game missing");
+    const st = entry.session.state;
+    const world = entry.session.world;
+    for (const label of ["created", "turn", "resumed"] as const) {
+      const body =
+        label === "created"
+          ? created.body as Record<string, unknown>
+          : label === "turn"
+            ? (await request(app).post(`/api/games/${gameId}/turn`).send({ text: "wait" })).body as Record<string, unknown>
+            : (await request(app).get(`/api/games/${gameId}`)).body as Record<string, unknown>;
+      const map = body["map"] as { rooms?: unknown; links?: unknown; unexplored?: unknown } | undefined;
+      expect(map).toBeDefined();
+      const rooms = (map?.rooms ?? []) as { id?: unknown; name?: unknown; isCurrent?: unknown }[];
+      const links = (map?.links ?? []) as { from?: unknown; to?: unknown; direction?: unknown }[];
+      const unexplored = (map?.unexplored ?? []) as { from?: unknown; direction?: unknown; to?: unknown; name?: unknown }[];
+      const visited = new Set(st.visitedRoomIds);
+      expect(rooms.length).toBe(visited.size);
+      const roomIds = new Set<string>();
+      for (const r of rooms) {
+        expect(typeof r.id).toBe("string");
+        expect(typeof r.name).toBe("string");
+        expect(typeof r.isCurrent).toBe("boolean");
+        roomIds.add(r.id as string);
+        expect(visited.has(r.id as string)).toBe(true);
+      }
+      expect(roomIds.has(st.currentRoomId)).toBe(true);
+      for (const l of links) {
+        expect(roomIds.has(l.from as string)).toBe(true);
+        expect(roomIds.has(l.to as string)).toBe(true);
+        expect(typeof l.direction).toBe("string");
+      }
+      for (const u of unexplored) {
+        expect(roomIds.has(u.from as string)).toBe(true);
+        expect(typeof u.direction).toBe("string");
+        expect(u.to).toBeUndefined();
+        expect(u.name).toBeUndefined();
+      }
+      // Never leak unvisited names/ids, trap info, relic room, or secrets.
+      const blob = JSON.stringify(map);
+      for (const [id, room] of Object.entries(world.rooms)) {
+        if (!visited.has(id)) {
+          expect(blob).not.toContain(id);
+          expect(blob).not.toContain(room.name);
+        }
+      }
+      const trap = st.secrets.trap;
+      if (!visited.has(trap.roomId)) expect(blob).not.toContain(trap.roomId);
+      expect(blob).not.toContain('"trap"');
+      expect(blob).not.toContain('"secrets"');
+      expect(blob).not.toContain(st.salt);
+      if (!visited.has(st.secrets.relicRoomId)) expect(blob).not.toContain(st.secrets.relicRoomId);
+    }
+    deps.store.stop();
+  });
 });
 
 describe("errors", () => {

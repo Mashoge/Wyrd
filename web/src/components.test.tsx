@@ -5,7 +5,8 @@ import { Ledger } from "./components/Ledger";
 import { BootScreen } from "./components/BootScreen";
 import { StoryFeed } from "./components/StoryFeed";
 import { Suggestions } from "./components/Suggestions";
-import type { PlayerViewEnemy, Suggestion, ToolLogEntry } from "./api";
+import { WhereYouAre } from "./components/WhereYouAre";
+import type { GameMap, PlayerViewEnemy, Suggestion, ToolLogEntry } from "./api";
 
 function enemy(partial: Partial<PlayerViewEnemy> = {}): PlayerViewEnemy {
   return {
@@ -54,6 +55,41 @@ describe("Suggestions objects", () => {
     expect(html).toContain("needs 9+");
     expect(html).not.toContain("#B44DFF");
     expect(html).not.toContain("background:#B44DFF");
+  });
+
+  it("shows a muted NEW tag for new exits and plain combo chips", () => {
+    const suggestions: Suggestion[] = [
+      { text: "Go east", kind: "move", isNew: true },
+      { text: "Sneak past the Goblin and grab the Silver Coin", kind: "combo" },
+    ];
+    const html = renderToStaticMarkup(<Suggestions suggestions={suggestions} disabled={false} onPick={() => {}} />);
+    expect(html).toContain("NEW");
+    expect(html).toContain("#3A2848");
+    expect(html).toContain("#E8CCFF");
+    expect(html).toContain("Sneak past the Goblin and grab the Silver Coin");
+    expect(html).not.toContain("wyrd-chip--attack");
+  });
+});
+
+describe("WhereYouAre mini-map", () => {
+  const demo: GameMap = {
+    rooms: [
+      { id: "entrance", name: "Crypt Entrance", isCurrent: false },
+      { id: "hall", name: "Echoing Hall", isCurrent: true },
+    ],
+    links: [{ from: "entrance", to: "hall", direction: "north" }],
+    unexplored: [{ from: "hall", direction: "east" }],
+  };
+
+  it("shows the room name once with violet current box and ? stubs", () => {
+    const html = renderToStaticMarkup(<WhereYouAre roomName="Echoing Hall" map={demo} />);
+    expect(html).toContain("Where you are");
+    expect(html).toContain("Echoing Hall");
+    expect(html).toContain("#B44DFF");
+    expect(html).toContain("?");
+    // Names live in the heading + hover titles only, never as visible map text.
+    expect(html).toContain("<title>Crypt Entrance</title>");
+    expect(html).not.toContain(">Crypt Entrance</text>");
   });
 });
 

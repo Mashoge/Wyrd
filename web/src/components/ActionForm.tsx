@@ -1,13 +1,36 @@
 import type { JSX } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface Props {
   disabled: boolean;
   onSubmit: (text: string) => void;
 }
 
+const PLACEHOLDERS = [
+  "What do you do?",
+  "Try: sneak past and grab the key",
+  "Try: ask what that sound is",
+  "Try anything — even cheating. The rules will check.",
+];
+
 export function ActionForm({ disabled, onSubmit }: Props): JSX.Element {
   const [value, setValue] = useState("");
+  const [focused, setFocused] = useState(false);
+  const [placeholderIdx, setPlaceholderIdx] = useState(0);
+  const active = value.length === 0 && !focused;
+  useEffect(() => {
+    if (!active) return;
+    if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        setPlaceholderIdx(0);
+        return;
+      }
+    }
+    const timer = setInterval(() => {
+      setPlaceholderIdx((i) => (i + 1) % PLACEHOLDERS.length);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, [active]);
   return (
     <form
       aria-label="Your action"
@@ -30,10 +53,12 @@ export function ActionForm({ disabled, onSubmit }: Props): JSX.Element {
         id="wyrd-action"
         type="text"
         className="wyrd-input"
-        placeholder="What do you do?"
+        placeholder={PLACEHOLDERS[placeholderIdx % PLACEHOLDERS.length] ?? "What do you do?"}
         value={value}
         disabled={disabled}
         onChange={(e) => setValue(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         style={{ flex: 1, minWidth: 220 }}
         maxLength={500}
         autoComplete="off"
