@@ -331,6 +331,20 @@ body {
   flex: none;
 }
 
+.wyrd-inspector-below {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  flex: none;
+}
+
+.wyrd-inspector-side {
+  min-width: 0;
+  display: none;
+  flex-direction: column;
+  flex: none;
+}
+
 @media (min-width: 1024px) {
   html, body {
     height: 100%;
@@ -392,6 +406,26 @@ body {
     background: transparent;
   }
   .wyrd-sidebar::-webkit-scrollbar-thumb {
+    background: #5A4A68;
+  }
+  .wyrd-inspector-below {
+    display: none;
+  }
+  .wyrd-inspector-side {
+    display: flex;
+    min-height: 0;
+    overflow-y: auto;
+    flex: 1 1 360px;
+    scrollbar-width: thin;
+    scrollbar-color: #5A4A68 transparent;
+  }
+  .wyrd-inspector-side::-webkit-scrollbar {
+    width: 8px;
+  }
+  .wyrd-inspector-side::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .wyrd-inspector-side::-webkit-scrollbar-thumb {
     background: #5A4A68;
   }
 }
@@ -474,11 +508,44 @@ body {
   }
 }
 
+/* Mic: violet outline idle, coral pulse while recording. */
+.wyrd-mic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #1a1421;
+  color: #f4eff6;
+  border: 2px solid #b44dff;
+  cursor: pointer;
+  font-family: "Inter", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  clip-path: polygon(6% 0, 100% 0, 94% 100%, 0 100%);
+}
+.wyrd-mic:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.wyrd-mic:focus-visible {
+  outline: 2px solid #b44dff;
+  outline-offset: 2px;
+}
+.wyrd-mic--recording {
+  border-color: #ff6b5b;
+  color: #ff6b5b;
+  animation: wyrd-mic-pulse 1s ease-in-out infinite;
+}
+@keyframes wyrd-mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 91, 0.55); }
+  50% { box-shadow: 0 0 0 8px rgba(255, 107, 91, 0); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .wyrd-seal-ring,
   .wyrd-seal-rune,
   .wyrd-seal-settled,
-  .wyrd-pending-bar {
+  .wyrd-pending-bar,
+  .wyrd-mic--recording {
     animation: none;
   }
   .wyrd-seal-ring {

@@ -4,9 +4,12 @@ import { EnemyCard } from "./components/EnemyCard";
 import { Ledger } from "./components/Ledger";
 import { BootScreen } from "./components/BootScreen";
 import { StoryFeed } from "./components/StoryFeed";
-import { Suggestions } from "./components/Suggestions";
+import { Suggestions, buildFreeTextHint } from "./components/Suggestions";
+import { CHEAT_FILLS, cheatFillForLabel, shouldClearHintOnBlur } from "./components/ActionForm";
+import { ActionForm } from "./components/ActionForm";
+import { freeTextHint } from "./components/freeTextHint";
 import { WhereYouAre } from "./components/WhereYouAre";
-import type { GameMap, PlayerViewEnemy, Suggestion, ToolLogEntry } from "./api";
+import type { GameMap, PlayerView, PlayerViewEnemy, Suggestion, ToolLogEntry } from "./api";
 
 function enemy(partial: Partial<PlayerViewEnemy> = {}): PlayerViewEnemy {
   return {
@@ -53,7 +56,6 @@ describe("Suggestions objects", () => {
     expect(html).toContain("Attack the Goblin");
     expect(html).toContain("attack");
     expect(html).toContain("needs 9+");
-    expect(html).not.toContain("#B44DFF");
     expect(html).not.toContain("background:#B44DFF");
   });
 
@@ -68,6 +70,113 @@ describe("Suggestions objects", () => {
     expect(html).toContain("#E8CCFF");
     expect(html).toContain("Sneak past the Goblin and grab the Silver Coin");
     expect(html).not.toContain("wyrd-chip--attack");
+  });
+
+  it("always appends a YOUR IDEA chip after the server chips", () => {
+    const suggestions: Suggestion[] = [
+      { text: "Attack the Goblin", kind: "attack", target: 9 },
+      { text: "Go north", kind: "move" },
+    ];
+    const html = renderToStaticMarkup(<Suggestions suggestions={suggestions} disabled={false} onPick={() => {}} />);
+    expect(html).toContain("YOUR IDEA");
+    expect(html).toContain("Something else…");
+    expect(html.indexOf("YOUR IDEA")).toBeGreaterThan(html.indexOf("Go north"));
+    expect(html).toContain('class="wyrd-chip"');
+  });
+
+  it("still shows the YOUR IDEA chip when the server sends zero suggestions", () => {
+    const html = renderToStaticMarkup(<Suggestions suggestions={[]} disabled={false} onPick={() => {}} />);
+    expect(html).toContain("YOUR IDEA");
+    expect(html).toContain("Something else…");
+  });
+
+  it("builds the free-text hint from the living enemy first", () => {
+    expect(buildFreeTextHint(demoView({ enemyName: "Goblin", passed: false, defeated: false }))).toBe(
+      "Try: throw something at the Goblin",
+    );
+    expect(freeTextHint(demoView({ enemyName: "Goblin", passed: false, defeated: false }))).toBe(
+      "Try: throw something at the Goblin",
+    );
+  });
+
+  it("falls back to the first room item, then to listening", () => {
+    expect(buildFreeTextHint(demoView({ enemyName: null, items: [{ id: "coin", name: "Silver Coin" }] }))).toBe(
+      "Try: examine the Silver Coin closely",
+    );
+    expect(buildFreeTextHint(demoView({ enemyName: null, items: [], enemyPassed: true }))).toBe("Try: ask what you hear");
+    expect(buildFreeTextHint(null)).toBe("Try: ask what you hear");
+  });
+
+  it("treats a passed or defeated enemy as gone for the hint", () => {
+    expect(buildFreeTextHint(demoView({ enemyName: "Goblin", passed: true, items: [{ id: "k", name: "Brass Key" }] }))).toBe(
+      "Try: examine the Brass Key closely",
+    );
+    expect(buildFreeTextHint(demoView({ enemyName: "Goblin", defeated: true, items: [] }))).toBe("Try: ask what you hear");
+  });
+});
+
+function demoView(args: {
+  enemyName?: string | null;
+  passed?: boolean;
+  defeated?: boolean;
+  enemyPassed?: boolean;
+  items?: { id: string; name: string }[];
+}): PlayerView {
+  const enemyName = args.enemyName === undefined ? "Goblin" : args.enemyName;
+  return {
+    room: { id: "hall", name: "Echoing Hall", description: "Dark." },
+    exits: [],
+    items: args.items ?? [],
+    enemy:
+      enemyName === null
+        ? null
+        : {
+            id: "goblin",
+            name: enemyName,
+            quirk: "counts coins",
+            passed: args.passed ?? args.enemyPassed ?? false,
+            defeated: args.defeated ?? false,
+            condition: args.defeated === true ? "defeated" : "unhurt",
+          },
+    player: { hp: 5, maxHp: 5, inventory: [], turn: 1, maxTurns: 10, status: "playing" },
+  };
+}
+
+describe("Free-text cheat buttons", () => {
+  it("maps the three rule-test labels to fill text without sending", () => {
+    expect(CHEAT_FILLS).toHaveLength(3);
+    expect(cheatFillForLabel("Claim a Legendary Sword")).toBe("I pick up the Legendary Sword");
+    expect(cheatFillForLabel("Say the enemy is dead")).toBe("The enemy here is already dead");
+    expect(cheatFillForLabel("Heal to full")).toBe("I drink a potion and I'm at full health");
+    expect(cheatFillForLabel("Unknown")).toBeNull();
+  });
+
+  it("renders Test the rules with muted label, violet small text buttons", () => {
+    const html = renderToStaticMarkup(<ActionForm disabled={false} onSubmit={() => {}} />);
+    expect(html).toContain("Test the rules:");
+    expect(html).toContain("Claim a Legendary Sword");
+    expect(html).toContain("Say the enemy is dead");
+    expect(html).toContain("Heal to full");
+    expect(html).toContain("#B9AEC0");
+    expect(html).toContain("#B44DFF");
+    expect(html).toContain("font-size:13px");
+    const buttons = html.match(/<button/g) ?? [];
+    // Form ACT + 3 cheat fills + mic + EN/TL toggles, all real buttons.
+    expect(buttons.length).toBe(7);
+    expect(html).toContain('aria-pressed="false"');
+    expect(html).toContain("EN");
+    expect(html).toContain("TL");
+  });
+
+  it("hides the cheat row while busy", () => {
+    const html = renderToStaticMarkup(<ActionForm disabled={true} onSubmit={() => {}} />);
+    expect(html).not.toContain("Test the rules:");
+    expect(html).not.toContain("Claim a Legendary Sword");
+  });
+
+  it("keeps the sticky hint until blur-empty or a sent turn", () => {
+    expect(shouldClearHintOnBlur("")).toBe(true);
+    expect(shouldClearHintOnBlur("I pick up the Legendary Sword")).toBe(false);
   });
 });
 

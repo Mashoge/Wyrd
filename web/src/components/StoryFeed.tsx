@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import type { ToolLogEntry } from "../api";
+import type { ToolLogEntry, TurnMeta } from "../api";
 import { RollRows } from "./RollRows";
 
 let turnSeq = 0;
@@ -25,6 +25,7 @@ export interface Turn {
   playerText: string | null;
   narration: string;
   toolLog: ToolLogEntry[];
+  meta?: TurnMeta | null;
   pending?: boolean;
   failed?: boolean;
 }

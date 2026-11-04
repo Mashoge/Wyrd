@@ -22,6 +22,9 @@ export interface AssistantMessage {
 
 export type ToolChoice = "auto" | "none";
 
+/** The Meta model id actually used. Single source of truth; index.ts and loop.ts read this. */
+export const MUSE_MODEL = "muse-spark-1.3";
+
 export interface MuseClientOptions {
   apiKey: string;
   fetchImpl?: typeof fetch;
@@ -31,6 +34,7 @@ export interface MuseClientOptions {
 }
 
 export interface MuseClient {
+  readonly model: string;
   chat(
     messages: ChatMessage[],
     tools?: unknown[],
@@ -102,11 +106,12 @@ export function createMuseClient(options: MuseClientOptions): MuseClient {
   const {
     apiKey,
     fetchImpl = fetch,
-    model = "muse-spark-1.3",
+    model = MUSE_MODEL,
     baseUrl = "https://api.meta.ai/v1",
     timeoutMs = 30000,
   } = options;
   return {
+    model,
     async chat(
       messages: ChatMessage[],
       tools?: unknown[],

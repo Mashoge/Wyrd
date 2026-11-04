@@ -2,6 +2,8 @@ import { describe, expect, it, vi, afterEach } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { GameOverView } from "./components/GameOver";
 import { Header } from "./components/Header";
+import { Inspector, formatMetaLine } from "./components/Inspector";
+import type { ToolLogEntry, TurnMeta } from "./api";
 import * as verifyMod from "./verify";
 import type { RevealResponse } from "./verify";
 
@@ -94,5 +96,72 @@ describe("Header verify state", () => {
     const verified = renderToStaticMarkup(<Header commitment="abcdef1234567890" verified={true} />);
     expect(verified).toContain("Fate verified");
     expect(verified).toContain("#4DE8B5");
+  });
+
+  it("renders a real Inspector toggle button with aria-pressed", () => {
+    const off = renderToStaticMarkup(
+      <Header commitment="abcdef1234567890" verified={false} inspectorOn={false} onToggleInspector={noop} />,
+    );
+    expect(off).toContain("<button");
+    expect(off).toContain("Inspector");
+    expect(off).toContain('aria-pressed="false"');
+    const on = renderToStaticMarkup(
+      <Header commitment="abcdef1234567890" verified={false} inspectorOn={true} onToggleInspector={noop} />,
+    );
+    expect(on).toContain('aria-pressed="true"');
+  });
+});
+
+describe("Inspector panel", () => {
+  const meta: TurnMeta = { model: "muse-spark-1.3", rounds: 2, toolCalls: 3, ms: 1800 };
+
+  function acceptedEntry(): ToolLogEntry {
+    return {
+      name: "attack",
+      args: { enemy_id: "goblin" },
+      result: {
+        ok: true,
+        action: "attack",
+        rolls: [{ purpose: "player attack", sides: 20, value: 15, target: 10, success: true, bonus: 0 }],
+        events: ["You struck the Goblin."],
+      },
+    };
+  }
+
+  function refusedEntry(): ToolLogEntry {
+    return {
+      name: "pick_up",
+      args: { item_id: "legendary_sword" },
+      result: { ok: false, action: "pick_up", reason: "There is no Legendary Sword here.", rolls: [], events: [] },
+    };
+  }
+
+  it("lists turns newest first with monospace tool calls and verdicts", () => {
+    const html = renderToStaticMarkup(
+      <Inspector
+        turns={[
+          { id: "old", playerText: "Go north", toolLog: [acceptedEntry()], meta },
+          { id: "new", playerText: "Grab the sword", toolLog: [refusedEntry()], meta },
+        ]}
+      />,
+    );
+    expect(html).toContain("What the AI asked for, and what the rules allowed.");
+    expect(html.indexOf("Grab the sword")).toBeLessThan(html.indexOf("Go north"));
+    expect(html).toContain("attack({");
+    expect(html).toContain("enemy_id");
+    expect(html).toContain("ui-monospace");
+    expect(html).toContain("ACCEPTED");
+    expect(html).toContain("REFUSED");
+    expect(html).toContain("#4DE8B5");
+    expect(html).toContain("There is no Legendary Sword here.");
+    expect(html).toContain("Attack roll 15");
+    expect(html).toContain("Muse Spark 1.3 · 2 rounds · 3 tool calls · 1.8s");
+  });
+
+  it("formats the meta footer exactly", () => {
+    expect(formatMetaLine({ model: "muse-spark-1.3", rounds: 1, toolCalls: 1, ms: 500 })).toBe(
+      "Muse Spark 1.3 · 1 round · 1 tool call · 0.5s",
+    );
+    expect(formatMetaLine(meta)).toBe("Muse Spark 1.3 · 2 rounds · 3 tool calls · 1.8s");
   });
 });

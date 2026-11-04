@@ -1,15 +1,34 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, JSX, RefObject } from "react";
 import { ApiError, bootGame, clearGameId, createGame, loadGameId, playTurn, saveGameId } from "./api";
-import type { GameMap, GameStatus, PlayerView, Suggestion, ToolLogEntry } from "./api";
+import type { GameMap, GameStatus, PlayerView, Suggestion, ToolLogEntry, TurnMeta } from "./api";
 import { ActionForm } from "./components/ActionForm";
 import { Header } from "./components/Header";
+import { Inspector, type InspectorTurn } from "./components/Inspector";
 import { Sidebar } from "./components/Sidebar";
 import { loadCommitment, resolveStoredCommitment } from "./api-commit";
 import { GameOver } from "./components/GameOver";
 import { StoryFeed, createTurnId, type Turn } from "./components/StoryFeed";
 import { Suggestions } from "./components/Suggestions";
 import { BootScreen, type BootPhase } from "./components/BootScreen";
+
+const INSPECTOR_STORAGE_KEY = "wyrd.inspector";
+
+function loadInspectorPref(): boolean {
+  try {
+    return window.localStorage.getItem(INSPECTOR_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveInspectorPref(on: boolean): void {
+  try {
+    window.localStorage.setItem(INSPECTOR_STORAGE_KEY, on ? "1" : "0");
+  } catch {
+    /* inspector toggle still works for this visit */
+  }
+}
 
 interface LoadedGame {
   gameId: string;
@@ -22,12 +41,12 @@ interface LoadedGame {
   map: GameMap;
 }
 
-export function openingTurn(narration: string, toolLog: ToolLogEntry[]): Turn {
-  return { id: createTurnId(), playerText: null, narration, toolLog };
+export function openingTurn(narration: string, toolLog: ToolLogEntry[], meta: TurnMeta | null = null): Turn {
+  return { id: createTurnId(), playerText: null, narration, toolLog, meta };
 }
 
-function freshTurn(playerText: string | null, narration: string, toolLog: ToolLogEntry[]): Turn {
-  return { id: createTurnId(), playerText, narration, toolLog };
+function freshTurn(playerText: string | null, narration: string, toolLog: ToolLogEntry[], meta: TurnMeta | null = null): Turn {
+  return { id: createTurnId(), playerText, narration, toolLog, meta };
 }
 
 function delay(ms: number): Promise<void> {
@@ -42,6 +61,7 @@ export function App(): JSX.Element {
   const [ledger, setLedger] = useState<ToolLogEntry[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [busy, setBusy] = useState(false);
+  const [inspectorOn, setInspectorOn] = useState<boolean>(() => loadInspectorPref());
   const [booting, setBooting] = useState(true);
   const [bootPhase, setBootPhase] = useState<BootPhase>("loading");
   const [bootFresh, setBootFresh] = useState<boolean>(true);
@@ -57,14 +77,14 @@ export function App(): JSX.Element {
   gameRef.current = game;
 
   const applyGameData = useCallback(
-    (g: { gameId: string; commitment: string; view: PlayerView; status: GameStatus; map?: GameMap }, fresh: boolean, narration: string | null, toolLog: ToolLogEntry[], sug: Suggestion[]): void => {
+    (g: { gameId: string; commitment: string; view: PlayerView; status: GameStatus; map?: GameMap }, fresh: boolean, narration: string | null, toolLog: ToolLogEntry[], sug: Suggestion[], meta: TurnMeta | null = null): void => {
       saveGameId(g.gameId);
       const resolved = resolveStoredCommitment(g.gameId, g.commitment);
       setGame((prev) => ({ gameId: g.gameId, commitment: g.commitment, storedCommitment: resolved.stored, sealMismatch: resolved.sealMismatch, verified: prev !== null && prev.gameId === g.gameId ? prev.verified : false, view: g.view, status: g.status, map: g.map ?? { rooms: [], links: [], unexplored: [] } }));
       if (fresh && narration !== null) {
-        setTurns([freshTurn(null, narration, toolLog)]);
+        setTurns([freshTurn(null, narration, toolLog, meta)]);
       } else if (!fresh && narration !== null) {
-        setTurns([openingTurn(narration, toolLog)]);
+        setTurns([openingTurn(narration, toolLog, meta)]);
       } else {
         setTurns([]);
       }
@@ -73,6 +93,14 @@ export function App(): JSX.Element {
     },
     [],
   );
+
+  const toggleInspector = useCallback((): void => {
+    setInspectorOn((prev) => {
+      const next = !prev;
+      saveInspectorPref(next);
+      return next;
+    });
+  }, []);
 
   const boot = useCallback(async (): Promise<void> => {
     const seq = bootSeq.current + 1;
@@ -107,13 +135,13 @@ export function App(): JSX.Element {
       setBootFresh(res.fresh);
       setBootCommitment(g.commitment);
       if (res.fresh && "narration" in g) {
-        applyGameData(g, true, g.narration, g.toolLog, g.suggestions);
+        applyGameData(g, true, g.narration, g.toolLog, g.suggestions, g.meta);
       } else if ("openingNarration" in g) {
         const narration = g.openingNarration;
         if (typeof narration === "string" && narration.length > 0) {
-          applyGameData(g, false, narration, g.openingToolLog, g.suggestions);
+          applyGameData(g, false, narration, g.openingToolLog, g.suggestions, g.openingMeta);
         } else {
-          applyGameData(g, false, null, [], g.suggestions);
+          applyGameData(g, false, null, [], g.suggestions, g.openingMeta);
         }
       } else {
         applyGameData(g, false, null, [], g.suggestions);
@@ -204,7 +232,7 @@ export function App(): JSX.Element {
       // Replace by id: never duplicate the player line, placeholder becomes real narration.
       setTurns((prev) =>
         prev.map((t) =>
-          t.id === pendingId ? { id: pendingId, playerText: clean, narration: res.narration, toolLog: res.toolLog } : t,
+          t.id === pendingId ? { id: pendingId, playerText: clean, narration: res.narration, toolLog: res.toolLog, meta: res.meta } : t,
         ),
       );
       setLedger((prev) => [...prev, ...res.toolLog]);
@@ -216,7 +244,7 @@ export function App(): JSX.Element {
         clearGameId();
         try {
           const fresh = await createGame();
-          applyGameData(fresh, true, fresh.narration, fresh.toolLog, fresh.suggestions);
+          applyGameData(fresh, true, fresh.narration, fresh.toolLog, fresh.suggestions, fresh.meta);
         } catch {
           setTurns((prev) =>
             prev.map((t) => (t.id === pendingId ? { ...t, pending: false, failed: true } : t)),
@@ -253,7 +281,7 @@ export function App(): JSX.Element {
     try {
       clearGameId();
       const fresh = await createGame();
-      applyGameData(fresh, true, fresh.narration, fresh.toolLog, fresh.suggestions);
+      applyGameData(fresh, true, fresh.narration, fresh.toolLog, fresh.suggestions, fresh.meta);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not start a new game.");
     } finally {
@@ -280,7 +308,7 @@ export function App(): JSX.Element {
   }, [over]);
 
   return AppLayout({
-    game, turns, ledger, suggestions, busy, booting, bootPhase, bootFresh, bootCommitment, bootSlow, error, over, won, storyScrollRef, onStoryScroll: handleStoryScroll, sendAction, retryTurn, retryBoot: boot, newGame, markVerified,
+    game, turns, ledger, suggestions, busy, inspectorOn, booting, bootPhase, bootFresh, bootCommitment, bootSlow, error, over, won, storyScrollRef, onStoryScroll: handleStoryScroll, sendAction, retryTurn, retryBoot: boot, newGame, markVerified, onToggleInspector: toggleInspector,
   });
 }
 
@@ -290,6 +318,7 @@ interface LayoutArgs {
   ledger: ToolLogEntry[];
   suggestions: Suggestion[];
   busy: boolean;
+  inspectorOn: boolean;
   booting: boolean;
   bootPhase: BootPhase;
   bootFresh: boolean;
@@ -304,14 +333,18 @@ interface LayoutArgs {
   retryTurn: (id: string, text: string) => Promise<void>;
   retryBoot: () => Promise<void>; markVerified: () => void;
   newGame: () => Promise<void>;
+  onToggleInspector: () => void;
 }
 
 function AppLayout(args: LayoutArgs): JSX.Element {
-  const { game, turns, ledger, suggestions, busy, booting, bootPhase, bootFresh, bootCommitment, bootSlow, error, over, won, storyScrollRef, onStoryScroll, sendAction, retryTurn, retryBoot, newGame, markVerified } = args;
+  const { game, turns, ledger, suggestions, busy, inspectorOn, booting, bootPhase, bootFresh, bootCommitment, bootSlow, error, over, won, storyScrollRef, onStoryScroll, sendAction, retryTurn, retryBoot, newGame, markVerified, onToggleInspector } = args;
+  const inspectorTurns: InspectorTurn[] = turns
+    .filter((t) => !t.pending && !t.failed)
+    .map((t) => ({ id: t.id, playerText: t.playerText, toolLog: t.toolLog, meta: t.meta ?? null }));
   return (
     <div className="wyrd-app">
       <div className="wyrd-app-inner">
-        {game !== null && <Header commitment={game.commitment} verified={game.verified} />}
+        {game !== null && <Header commitment={game.commitment} verified={game.verified} inspectorOn={inspectorOn} onToggleInspector={onToggleInspector} />}
         <div className="font-rune" aria-hidden="true" style={runeStyle}>
           ᚹ ᚣ ᚱ ᛞ ᛫ ᚠ ᚨ ᛏ ᛖ ᛫ ᚹ ᚣ ᚱ ᛞ ᛫ ᚠ ᚨ ᛏ ᛖ ᛫ ᚹ ᚣ ᚱ ᛞ
         </div>
@@ -337,6 +370,11 @@ function AppLayout(args: LayoutArgs): JSX.Element {
                 className="wyrd-story-scroll"
               >
                 <StoryFeed turns={turns} onRetry={(id, text) => void retryTurn(id, text)} />
+                {inspectorOn && (
+                  <div className="wyrd-inspector-below">
+                    <Inspector turns={inspectorTurns} />
+                  </div>
+                )}
                 {over && game !== null && (
                   <GameOver gameId={game.gameId} storedCommitment={game.storedCommitment ?? loadCommitment(game.gameId) ?? game.commitment} sealMismatch={game.sealMismatch} won={won} onVerified={markVerified} />
                 )}
@@ -352,12 +390,17 @@ function AppLayout(args: LayoutArgs): JSX.Element {
               </div>
               {!over && (
                 <div style={pinnedBarStyle}>
-                  <Suggestions suggestions={suggestions} disabled={busy} onPick={(t) => void sendAction(t)} />
-                  <ActionForm disabled={busy} onSubmit={(t) => void sendAction(t)} />
+                  <Suggestions suggestions={suggestions} disabled={busy} onPick={(t) => void sendAction(t)} view={game.view} />
+                  <ActionForm disabled={busy} gameId={game.gameId} onSubmit={(t) => void sendAction(t)} />
                 </div>
               )}
             </main>
             <Sidebar view={game.view} status={game.status} ledger={ledger} map={game.map} />
+            {inspectorOn && (
+              <div className="wyrd-inspector-side">
+                <Inspector turns={inspectorTurns} />
+              </div>
+            )}
           </div>
         )}
       </div>

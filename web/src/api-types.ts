@@ -7,6 +7,9 @@ export interface ToolResult {
   ok: boolean; action: string; reason?: string;
   rolls: DiceRoll[]; events: string[];
 }
+export interface TurnMeta {
+  model: string; rounds: number; toolCalls: number; ms: number;
+}
 export interface ToolLogEntry {
   name: string; args: Record<string, unknown>; result: ToolResult;
 }
@@ -35,13 +38,16 @@ export interface GameMap { rooms: GameMapRoom[]; links: GameMapLink[]; unexplore
 export interface NewGameResponse {
   gameId: string; commitment: string; narration: string;
   toolLog: ToolLogEntry[]; view: PlayerView; status: GameStatus; suggestions: Suggestion[]; map: GameMap;
+  meta: TurnMeta;
 }
 export interface TurnResponse {
   narration: string; toolLog: ToolLogEntry[];
   view: PlayerView; status: GameStatus; suggestions: Suggestion[]; map: GameMap;
+  meta: TurnMeta;
 }
 export interface ResumeResponse {
   gameId: string; commitment: string;
   view: PlayerView; status: GameStatus; suggestions: Suggestion[];
   openingNarration: string; openingToolLog: ToolLogEntry[]; map: GameMap;
+  openingMeta: TurnMeta | null;
 }

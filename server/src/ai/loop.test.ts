@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { startGame } from "../game/state.js";
 import type { GameState, Rng, World } from "../game/types.js";
 import { sunkenCrypt } from "../game/worlds/sunkenCrypt.js";
+import { MUSE_MODEL } from "./client.js";
 import type { AssistantMessage, ChatMessage, ToolChoice } from "./client.js";
 import { runTurn, type TurnHistoryEntry } from "./loop.js";
 import { GAME_MASTER_PROMPT } from "./prompt.js";
@@ -143,6 +144,42 @@ describe("runTurn basics", () => {
     expect(state).toEqual(before);
     expect(result.narration).toBe("You found gold! Riches!");
     scanForLeaks(fake.requests, state);
+  });
+
+  it("meta reports the model id, rounds, tool calls, and ms", async () => {
+    const { state, world } = freshGame();
+    state.currentRoomId = "library";
+    const fake = new FakeClient([
+      toolMsg("c1", "pick_up", { item_id: "old_map" }),
+      { content: "You picked up the map." },
+    ]);
+    const nowValues = [1000, 2800];
+    let nowIndex = 0;
+    const result = await runTurn(
+      { state, world, history: [] },
+      "pick up the map",
+      { client: fake, rng: seqRng([]), now: () => (nowValues[nowIndex++] ?? 2800) as number },
+    );
+    expect(result.meta.model).toBe(MUSE_MODEL);
+    expect(result.meta.model).toBe("muse-spark-1.3");
+    expect(result.meta.rounds).toBe(2);
+    expect(result.meta.toolCalls).toBe(1);
+    expect(result.meta.ms).toBe(1800);
+    scanForLeaks(fake.requests, state);
+  });
+
+  it("meta reads a custom model id off the client, not a hardcoded string", async () => {
+    const { state, world } = freshGame();
+    const fake = { model: "muse-spark-9.9", chat: async (): Promise<AssistantMessage> => ({ content: "Calm." }) };
+    const result = await runTurn(
+      { state, world, history: [] },
+      "hello",
+      { client: fake, rng: seqRng([]), now: () => 5000 },
+    );
+    expect(result.meta.model).toBe("muse-spark-9.9");
+    expect(result.meta.rounds).toBe(1);
+    expect(result.meta.toolCalls).toBe(0);
+    expect(result.meta.ms).toBe(0);
   });
 });
 

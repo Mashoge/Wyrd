@@ -1,5 +1,5 @@
 import { randomInt } from "node:crypto";
-import { createMuseClient } from "./ai/client.js";
+import { createMuseClient, MUSE_MODEL } from "./ai/client.js";
 import { newSalt } from "./game/secrets.js";
 import type { Rng } from "./game/types.js";
 import { createApp } from "./http/app.js";
@@ -21,7 +21,7 @@ function main(): void {
   const port = Number(portRaw);
   const listenPort = Number.isInteger(port) && port > 0 ? port : 8787;
 
-  const client = createMuseClient({ apiKey, model: "muse-spark-1.3" });
+  const client = createMuseClient({ apiKey, model: MUSE_MODEL });
   const store = new SessionStore();
   const app = createApp({
     store,

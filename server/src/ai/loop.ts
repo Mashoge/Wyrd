@@ -5,6 +5,7 @@ import type {
   ToolResult,
   World,
 } from "../game/types.js";
+import { MUSE_MODEL } from "./client.js";
 import type { AssistantMessage, ChatMessage, ToolChoice } from "./client.js";
 import { GAME_MASTER_PROMPT } from "./prompt.js";
 import { TOOL_DEFINITIONS, executeTool } from "./tools.js";
@@ -22,6 +23,7 @@ export interface TurnSession {
 }
 
 export interface TurnClient {
+  readonly model?: string;
   chat(
     messages: ChatMessage[],
     tools?: unknown[],
@@ -32,6 +34,8 @@ export interface TurnClient {
 export interface TurnDeps {
   client: TurnClient;
   rng: Rng;
+  /** Injected clock so tests can control turn timing. Defaults to Date.now. */
+  now?: () => number;
 }
 
 export interface ToolLogEntry {
@@ -40,11 +44,19 @@ export interface ToolLogEntry {
   result: ToolResult;
 }
 
+export interface TurnMeta {
+  model: string;
+  rounds: number;
+  toolCalls: number;
+  ms: number;
+}
+
 export interface TurnResult {
   narration: string;
   toolLog: ToolLogEntry[];
   view: PlayerView;
   status: GameStatus;
+  meta: TurnMeta;
 }
 
 const MAX_ROUNDS = 3;
@@ -92,6 +104,17 @@ export async function runTurn(
   const toolLog: ToolLogEntry[] = [];
   const allEvents: string[] = [];
   let totalCalls = 0;
+  const now = deps.now ?? Date.now;
+  const startedAt = now();
+  let rounds = 0;
+  const model = deps.client.model ?? MUSE_MODEL;
+
+  const meta = (): TurnMeta => ({
+    model,
+    rounds,
+    toolCalls: toolLog.length,
+    ms: Math.max(0, now() - startedAt),
+  });
 
   const openingView = playerView(state, world);
   const conversation: ChatMessage[] = [
@@ -118,6 +141,7 @@ export async function runTurn(
       toolLog,
       view: playerView(state, world),
       status: state.status,
+      meta: meta(),
     };
   };
 
@@ -133,6 +157,7 @@ export async function runTurn(
         TOOL_DEFINITIONS,
         "auto",
       );
+      rounds += 1;
       const toolCalls = lastMessage.tool_calls;
       if (toolCalls === undefined || toolCalls.length === 0) {
         narration = lastMessage.content ?? "";
@@ -186,6 +211,7 @@ export async function runTurn(
         TOOL_DEFINITIONS,
         "none",
       );
+      rounds += 1;
       narration = final.content ?? "";
     }
 

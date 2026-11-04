@@ -1,4 +1,4 @@
-import type { DiceRoll, GameMap, NewGameResponse, PlayerView, ResumeResponse, Suggestion } from "./api-types";
+import type { DiceRoll, GameMap, NewGameResponse, PlayerView, ResumeResponse, Suggestion, TurnMeta } from "./api-types";
 import type { ToolLogEntry, ToolResult, TurnResponse } from "./api-types";
 import { ApiError, apiBaseUrl, clearGameId } from "./api-base";
 import { loadGameId, saveGameId } from "./api-base";
@@ -22,6 +22,7 @@ export type {
   Suggestion,
   ToolLogEntry,
   ToolResult,
+  TurnMeta,
   TurnResponse,
 } from "./api-types";
 export { ApiError, clearGameId, loadGameId, saveGameId } from "./api-base";
@@ -180,6 +181,19 @@ async function getJson(path: string): Promise<Record<string, unknown>> {
   return body;
 }
 
+function toTurnMeta(value: unknown): TurnMeta | null {
+  if (!isRecord(value)) return null;
+  const model = value["model"];
+  const rounds = value["rounds"];
+  const toolCalls = value["toolCalls"];
+  const ms = value["ms"];
+  if (typeof model !== "string") return null;
+  if (typeof rounds !== "number" || !Number.isFinite(rounds)) return null;
+  if (typeof toolCalls !== "number" || !Number.isFinite(toolCalls)) return null;
+  if (typeof ms !== "number" || !Number.isFinite(ms)) return null;
+  return { model, rounds, toolCalls, ms };
+}
+
 function toToolLog(value: unknown): ToolLogEntry[] {
   if (!Array.isArray(value)) return [];
   const out: ToolLogEntry[] = [];
@@ -199,10 +213,12 @@ function toToolLog(value: unknown): ToolLogEntry[] {
 export async function createGame(): Promise<NewGameResponse> {
   const body = await postJson("/api/games", {});
   const view = toPlayerView(body["view"]);
+  const meta = toTurnMeta(body["meta"]);
   if (typeof body["gameId"] !== "string") throw new ApiError(502, "Bad game.");
   if (typeof body["commitment"] !== "string") throw new ApiError(502, "Bad game.");
   if (typeof body["narration"] !== "string") throw new ApiError(502, "Bad game.");
   if (view === null) throw new ApiError(502, "Bad game.");
+  if (meta === null) throw new ApiError(502, "Bad game.");
   return {
     gameId: body["gameId"],
     commitment: body["commitment"],
@@ -212,14 +228,17 @@ export async function createGame(): Promise<NewGameResponse> {
     status: toStatus(body["status"]),
     suggestions: toSuggestions(body["suggestions"]),
     map: toGameMap(body["map"]),
+    meta,
   };
 }
 
 export async function playTurn(gameId: string, text: string): Promise<TurnResponse> {
   const body = await postJson(`/api/games/${encodeURIComponent(gameId)}/turn`, { text });
   const view = toPlayerView(body["view"]);
+  const meta = toTurnMeta(body["meta"]);
   if (typeof body["narration"] !== "string") throw new ApiError(502, "Bad turn.");
   if (view === null) throw new ApiError(502, "Bad turn.");
+  if (meta === null) throw new ApiError(502, "Bad turn.");
   return {
     narration: body["narration"],
     toolLog: toToolLog(body["toolLog"]),
@@ -227,6 +246,7 @@ export async function playTurn(gameId: string, text: string): Promise<TurnRespon
     status: toStatus(body["status"]),
     suggestions: toSuggestions(body["suggestions"]),
     map: toGameMap(body["map"]),
+    meta,
   };
 }
 
@@ -244,8 +264,29 @@ export async function fetchGame(gameId: string): Promise<ResumeResponse> {
     suggestions: toSuggestions(body["suggestions"]),
     openingNarration: body["openingNarration"],
     openingToolLog: toToolLog(body["openingToolLog"]),
+    openingMeta: toTurnMeta(body["openingMeta"]),
     map: toGameMap(body["map"]),
   };
+}
+
+export type VoiceLang = "en" | "tl";
+
+export async function transcribeVoice(gameId: string, wav: Uint8Array, lang: VoiceLang): Promise<string> {
+  let res: Response;
+  try {
+    res = await fetch(`${apiBaseUrl()}/api/games/${encodeURIComponent(gameId)}/voice?lang=${lang}`, {
+      method: "POST",
+      headers: { "Content-Type": "audio/wav" },
+      body: new Blob([new Uint8Array(wav)], { type: "audio/wav" }),
+    });
+  } catch {
+    throw new ApiError(502, "Could not transcribe that — try again.");
+  }
+  const body = await parseBody(res);
+  if (!res.ok) throw new ApiError(res.status, failMessage(res.status, body));
+  const text = body["text"];
+  if (typeof text !== "string" || text.trim().length === 0) throw new ApiError(502, "Didn't catch that — try again.");
+  return text;
 }
 
 export async function bootGame(): Promise<{ game: ResumeResponse | NewGameResponse; fresh: boolean }> {

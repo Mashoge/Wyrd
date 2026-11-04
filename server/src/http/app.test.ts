@@ -70,6 +70,8 @@ describe("health + game lifecycle", () => {
     expect(Array.isArray(res.body.toolLog)).toBe(true);
     expect(res.body.view).toBeDefined();
     expect(res.body.status).toBe("playing");
+    expect(res.body.meta).toMatchObject({ model: "muse-spark-1.3", rounds: 1, toolCalls: 0 });
+    expect(typeof res.body.meta.ms).toBe("number");
     const entry = deps.store.get(res.body.gameId as string);
     expect(entry).toBeDefined();
     const blob = JSON.stringify(res.body);
@@ -77,6 +79,34 @@ describe("health + game lifecycle", () => {
     if (state === undefined) throw new Error("missing state");
     expect(blob).not.toContain(state.salt);
     expect(blob).not.toContain(JSON.stringify(state.secrets));
+    deps.store.stop();
+  });
+
+  it("turn responses carry meta with model, rounds, toolCalls, and ms", async () => {
+    const client = new FakeClient();
+    client.script = [{ content: "Dark steps descend." }];
+    const deps = makeDeps(client, { ms: 0 });
+    const app = createApp(deps);
+    const created = await request(app).post("/api/games");
+    expect(created.status).toBe(201);
+    const gameId = created.body.gameId as string;
+    client.script = [
+      {
+        content: null,
+        tool_calls: [
+          { id: "c1", type: "function", function: { name: "look", arguments: "{}" } },
+        ],
+      },
+      { content: "You looked." },
+    ];
+    const turn = await request(app).post(`/api/games/${gameId}/turn`).send({ text: "look around" });
+    expect(turn.status).toBe(200);
+    expect(turn.body.meta).toMatchObject({ model: "muse-spark-1.3", rounds: 2, toolCalls: 1 });
+    expect(typeof turn.body.meta.ms).toBe("number");
+    const resumed = await request(app).get(`/api/games/${gameId}`);
+    expect(resumed.status).toBe(200);
+    expect(resumed.body.openingMeta).toMatchObject({ model: "muse-spark-1.3" });
+    expect(typeof resumed.body.openingMeta.rounds).toBe("number");
     deps.store.stop();
   });
 

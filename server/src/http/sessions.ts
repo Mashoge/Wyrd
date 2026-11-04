@@ -1,4 +1,4 @@
-import type { ToolLogEntry, TurnSession } from "../ai/loop.js";
+import type { ToolLogEntry, TurnMeta, TurnSession } from "../ai/loop.js";
 
 export interface SessionEntry {
   session: TurnSession;
@@ -6,6 +6,7 @@ export interface SessionEntry {
   busy: boolean;
   openingNarration?: string;
   openingToolLog?: ToolLogEntry[];
+  openingMeta?: TurnMeta;
 }
 
 export interface SessionStoreOptions {

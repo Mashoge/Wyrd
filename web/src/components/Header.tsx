@@ -4,9 +4,11 @@ import { shortCommit } from "../format";
 interface Props {
   commitment: string;
   verified: boolean;
+  inspectorOn?: boolean;
+  onToggleInspector?: () => void;
 }
 
-export function Header({ commitment, verified }: Props): JSX.Element {
+export function Header({ commitment, verified, inspectorOn = false, onToggleInspector }: Props): JSX.Element {
   return (
     <header
       style={{
@@ -30,7 +32,25 @@ export function Header({ commitment, verified }: Props): JSX.Element {
           </div>
         </div>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <button
+          type="button"
+          aria-pressed={inspectorOn}
+          onClick={onToggleInspector}
+          style={{
+            background: inspectorOn ? "#B44DFF" : "transparent",
+            color: inspectorOn ? "#120E17" : "#F4EFF6",
+            border: "1px solid #5A4A68",
+            fontFamily: "Inter,sans-serif",
+            fontSize: 13,
+            fontWeight: 600,
+            minHeight: 44,
+            padding: "0 18px",
+            cursor: "pointer",
+          }}
+        >
+          Inspector
+        </button>
         <svg width="46" height="46" viewBox="0 0 48 48" role="img" aria-label={verified ? "Seal, fate verified" : "Seal, fate sealed"}>
           {verified ? (
             <g>

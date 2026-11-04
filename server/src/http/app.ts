@@ -1,7 +1,8 @@
 import cors from "cors";
 import express, { type Express, type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
-import { runTurn, type TurnClient } from "../ai/loop.js";
+import { runTurn, type TurnClient, type TurnMeta } from "../ai/loop.js";
+import { MUSE_MODEL } from "../ai/client.js";
 import { suggestActions } from "../ai/suggest.js";
 import { executeTool } from "../ai/tools.js";
 import { playerView, type PlayerView } from "../ai/view.js";
@@ -12,6 +13,7 @@ import { startGame } from "../game/state.js";
 import { lossTip } from "../game/tips.js";
 import type { GameState, GameStatus, Rng, World } from "../game/types.js";
 import { sunkenCrypt } from "../game/worlds/sunkenCrypt.js";
+import { transcribeAudio, parseVoiceLanguage, VoiceError } from "../ai/voice.js";
 import { SessionStore } from "./sessions.js";
 import { buildMap } from "./map.js";
 
@@ -21,12 +23,25 @@ export interface AppDeps {
   newRng: () => Rng;
   newSalt: () => string;
   now: () => number;
+  voiceFetch?: typeof fetch;
+  voiceApiKey?: string;
+}
+
+function runMeta(model: string, startedAt: number, now: number, rounds: number, toolCalls: number): TurnMeta {
+  return {
+    model,
+    rounds,
+    toolCalls,
+    ms: Math.max(0, now - startedAt),
+  };
 }
 
 const TURNS_PER_MINUTE = 10;
+const VOICE_PER_MINUTE = 10;
 const GAMES_PER_MINUTE_PER_IP = 5;
 const WINDOW_MS = 60 * 1000;
 const MAX_TEXT_LENGTH = 500;
+const MAX_WAV_BYTES = 1024 * 1024;
 
 function allowedOrigins(): string[] {
   const raw = process.env["WEB_ORIGIN"] ?? "";
@@ -81,6 +96,7 @@ export function createApp(deps: AppDeps): Express {
   const gameRngs = new Map<string, Rng>();
   const gameCreationsByIp = new Map<string, number[]>();
   const turnsByGame = new Map<string, number[]>();
+  const voiceByGame = new Map<string, number[]>();
 
   function gameCreationAllowed(ip: string): boolean {
     const nowMs = deps.now();
@@ -103,6 +119,18 @@ export function createApp(deps: AppDeps): Express {
     }
     prev.push(nowMs);
     turnsByGame.set(gameId, prev);
+    return true;
+  }
+
+  function voiceAllowed(gameId: string): boolean {
+    const nowMs = deps.now();
+    const prev = prune(voiceByGame.get(gameId) ?? [], nowMs);
+    if (prev.length >= VOICE_PER_MINUTE) {
+      voiceByGame.set(gameId, prev);
+      return false;
+    }
+    prev.push(nowMs);
+    voiceByGame.set(gameId, prev);
     return true;
   }
 
@@ -129,10 +157,13 @@ export function createApp(deps: AppDeps): Express {
     gameRngs.set(gameId, rng);
 
     entry.busy = true;
+    const startedAt = deps.now();
+    const model = deps.client.model ?? MUSE_MODEL;
     try {
-      const result = await runTurn(session, "Look around.", { client: deps.client, rng });
+      const result = await runTurn(session, "Look around.", { client: deps.client, rng, now: deps.now });
       entry.openingNarration = result.narration;
       entry.openingToolLog = result.toolLog;
+      entry.openingMeta = result.meta;
       deps.store.touch(gameId);
       res.status(201).json({
         gameId,
@@ -144,6 +175,7 @@ export function createApp(deps: AppDeps): Express {
         suggestions: suggestActions(result.view, sunkenCrypt, state.lastRoomId),
         map: buildMap(state, sunkenCrypt),
         enemyHp: enemyHp(state, sunkenCrypt),
+        meta: result.meta,
       });
     } catch {
       const look = executeTool(state, sunkenCrypt, "look", "{}", rng);
@@ -156,6 +188,7 @@ export function createApp(deps: AppDeps): Express {
       const status: GameStatus = state.status;
       entry.openingNarration = narration;
       entry.openingToolLog = [];
+      entry.openingMeta = runMeta(model, startedAt, deps.now(), 0, 0);
       deps.store.touch(gameId);
       res.status(201).json({
         gameId,
@@ -167,6 +200,7 @@ export function createApp(deps: AppDeps): Express {
         suggestions: suggestActions(view, sunkenCrypt, state.lastRoomId),
         map: buildMap(state, sunkenCrypt),
         enemyHp: enemyHp(state, sunkenCrypt),
+        meta: entry.openingMeta,
       });
     } finally {
       entry.busy = false;
@@ -206,7 +240,7 @@ export function createApp(deps: AppDeps): Express {
     }
     entry.busy = true;
     try {
-      const result = await runTurn(entry.session, text, { client: deps.client, rng });
+      const result = await runTurn(entry.session, text, { client: deps.client, rng, now: deps.now });
       deps.store.touch(gameId);
       res.json({
         narration: result.narration,
@@ -216,6 +250,7 @@ export function createApp(deps: AppDeps): Express {
         suggestions: suggestActions(result.view, entry.session.world, entry.session.state.lastRoomId),
         map: buildMap(entry.session.state, entry.session.world),
         enemyHp: enemyHp(entry.session.state, entry.session.world),
+        meta: result.meta,
       });
     } catch {
       sendErr(res, 502, "The game master is unavailable, try again.");
@@ -223,6 +258,53 @@ export function createApp(deps: AppDeps): Express {
       entry.busy = false;
     }
   });
+
+  app.post(
+    "/api/games/:id/voice",
+    express.raw({ type: "audio/wav", limit: MAX_WAV_BYTES }),
+    async (req: Request, res: Response) => {
+      const gameId = req.params["id"] as string;
+      const entry = deps.store.get(gameId);
+      if (entry === undefined) {
+        sendErr(res, 404, "Game not found.");
+        return;
+      }
+      const language = parseVoiceLanguage(req.query["lang"]);
+      if (language === null) {
+        sendErr(res, 400, "Language must be en or tl.");
+        return;
+      }
+      const audio: unknown = req.body;
+      if (!Buffer.isBuffer(audio) || audio.length === 0) {
+        sendErr(res, 400, "Send a WAV recording (audio/wav).");
+        return;
+      }
+      if (audio.length > MAX_WAV_BYTES) {
+        sendErr(res, 413, "Recording too long — keep it under 30 seconds.");
+        return;
+      }
+      if (!voiceAllowed(gameId)) {
+        sendErr(res, 429, "Too many voice clips — wait a moment.");
+        return;
+      }
+      deps.store.touch(gameId);
+      try {
+        const text = await transcribeAudio({
+          audio,
+          language,
+          apiKey: deps.voiceApiKey ?? process.env["META_API_KEY"],
+          ...(deps.voiceFetch !== undefined ? { fetchImpl: deps.voiceFetch } : {}),
+        });
+        res.json({ text });
+      } catch (err) {
+        if (err instanceof VoiceError) {
+          sendErr(res, 502, err.message);
+          return;
+        }
+        sendErr(res, 502, "Could not transcribe that — try again.");
+      }
+    },
+  );
 
   app.get("/api/games/:id", (req: Request, res: Response) => {
     const gameId = req.params["id"] as string;
@@ -242,6 +324,7 @@ export function createApp(deps: AppDeps): Express {
       suggestions: suggestActions(resumeView, world, state.lastRoomId),
       openingNarration: entry.openingNarration ?? "",
       openingToolLog: entry.openingToolLog ?? [],
+      openingMeta: entry.openingMeta ?? runMeta(deps.client.model ?? MUSE_MODEL, deps.now(), deps.now(), 0, 0),
       map: buildMap(state, world),
       enemyHp: enemyHp(state, world),
     });
