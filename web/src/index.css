@@ -279,6 +279,58 @@ body {
   background: #3a2848;
 }
 
+.wyrd-app {
+  min-height: 100dvh;
+  background: #120e17;
+  color: #f4eff6;
+  display: flex;
+  flex-direction: column;
+}
+
+.wyrd-app-inner {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px 28px 32px;
+  flex: 1;
+  min-height: 0;
+}
+
+.wyrd-board {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  flex: 1;
+  min-height: 0;
+}
+
+.wyrd-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.wyrd-story-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-right: 4px;
+}
+
+.wyrd-sidebar {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: none;
+}
+
 @media (min-width: 1024px) {
   html, body {
     height: 100%;
@@ -305,6 +357,7 @@ body {
     overflow: hidden;
   }
   .wyrd-main {
+    flex: 999 1 620px;
     min-height: 0;
     overflow: hidden;
   }

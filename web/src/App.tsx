@@ -262,8 +262,22 @@ export function App(): JSX.Element {
     }
   }, [applyGameData]);
 
-  const markVerified = useCallback((): void => { setGame((prev) => (prev === null ? prev : { ...prev, verified: true })); }, []);  const over = game !== null && game.status !== "playing";
+  const markVerified = useCallback((): void => { setGame((prev) => (prev === null ? prev : { ...prev, verified: true })); }, []);
+  const over = game !== null && game.status !== "playing";
   const won = game !== null && game.status === "won";
+
+  // When the game ends no new turn is appended, so pin the story to the reveal.
+  useEffect(() => {
+    if (!over) return;
+    stickRef.current = true;
+    const target = storyScrollRef.current;
+    if (target === null) return;
+    const reduced =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    target.scrollTo({ top: target.scrollHeight, behavior: reduced ? "auto" : "smooth" });
+  }, [over]);
 
   return AppLayout({
     game, turns, ledger, suggestions, busy, booting, bootPhase, bootFresh, bootCommitment, bootSlow, error, over, won, storyScrollRef, onStoryScroll: handleStoryScroll, sendAction, retryTurn, retryBoot: boot, newGame, markVerified,
@@ -295,8 +309,8 @@ interface LayoutArgs {
 function AppLayout(args: LayoutArgs): JSX.Element {
   const { game, turns, ledger, suggestions, busy, booting, bootPhase, bootFresh, bootCommitment, bootSlow, error, over, won, storyScrollRef, onStoryScroll, sendAction, retryTurn, retryBoot, newGame, markVerified } = args;
   return (
-    <div className="wyrd-app" style={appShellStyle}>
-      <div className="wyrd-app-inner" style={appInnerStyle}>
+    <div className="wyrd-app">
+      <div className="wyrd-app-inner">
         {game !== null && <Header commitment={game.commitment} verified={game.verified} />}
         <div className="font-rune" aria-hidden="true" style={runeStyle}>
           ᚹ ᚣ ᚱ ᛞ ᛫ ᚠ ᚨ ᛏ ᛖ ᛫ ᚹ ᚣ ᚱ ᛞ ᛫ ᚠ ᚨ ᛏ ᛖ ᛫ ᚹ ᚣ ᚱ ᛞ
@@ -313,29 +327,28 @@ function AppLayout(args: LayoutArgs): JSX.Element {
         {error !== null && !booting && (
           <div role="alert" style={alertStyle}>{error}</div>
         )}
-        {over && game !== null && (
-          <GameOver gameId={game.gameId} storedCommitment={game.storedCommitment ?? loadCommitment(game.gameId) ?? game.commitment} sealMismatch={game.sealMismatch} won={won} onVerified={markVerified} />
-        )}
-        {over && (
-          <div className="panel-cut" style={bannerRowStyle}>
-            <div style={newGameRow}>
-              <button type="button" className="wyrd-btn" onClick={() => void newGame()} disabled={busy} style={newGameStyle}>
-                New game
-              </button>
-            </div>
-          </div>
-        )}
         {game !== null && !booting && (
-          <div className="wyrd-board" style={boardStyle}>
-            <main className="wyrd-main" style={mainStyle}>
+          <div className="wyrd-board">
+            <main className="wyrd-main">
               <div
                 ref={storyScrollRef}
                 onScroll={onStoryScroll}
                 aria-live="polite"
                 className="wyrd-story-scroll"
-                style={storyScrollStyle}
               >
                 <StoryFeed turns={turns} onRetry={(id, text) => void retryTurn(id, text)} />
+                {over && game !== null && (
+                  <GameOver gameId={game.gameId} storedCommitment={game.storedCommitment ?? loadCommitment(game.gameId) ?? game.commitment} sealMismatch={game.sealMismatch} won={won} onVerified={markVerified} />
+                )}
+                {over && (
+                  <div className="panel-cut" style={bannerRowStyle}>
+                    <div style={newGameRow}>
+                      <button type="button" className="wyrd-btn" onClick={() => void newGame()} disabled={busy} style={newGameStyle}>
+                        New game
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
               {!over && (
                 <div style={pinnedBarStyle}>
@@ -354,11 +367,6 @@ function AppLayout(args: LayoutArgs): JSX.Element {
 
 const runeStyle: CSSProperties = { color: "#5B4A66", fontSize: 14, letterSpacing: "1.2em", textAlign: "center", whiteSpace: "nowrap", overflow: "hidden" };
 const alertStyle: CSSProperties = { background: "#1A1421", borderLeft: "4px solid #FF6B5B", padding: "12px 16px", fontSize: 14 };
-const appShellStyle: CSSProperties = { minHeight: "100dvh", background: "#120E17", color: "#F4EFF6", display: "flex", flexDirection: "column" };
-const appInnerStyle: CSSProperties = { width: "100%", maxWidth: 1440, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20, padding: "24px 28px 32px", flex: 1, minHeight: 0 };
-const boardStyle: CSSProperties = { display: "flex", flexWrap: "wrap", gap: 24, flex: 1, minHeight: 0 };
-const mainStyle: CSSProperties = { flex: "999 1 620px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16, minHeight: 0 };
-const storyScrollStyle: CSSProperties = { display: "flex", flexDirection: "column", gap: 16, paddingRight: 4 };
 const pinnedBarStyle: CSSProperties = { flexShrink: 0, background: "#1A1421", borderTop: "1px solid #5A4A68", padding: 12, display: "flex", flexDirection: "column", gap: 12 };
 const bannerRowStyle: CSSProperties = { background: "#1A1421", padding: "14px 22px", display: "flex", justifyContent: "flex-end" };
 const newGameStyle: CSSProperties = { background: "#B44DFF", color: "#120E17", marginLeft: "auto" };

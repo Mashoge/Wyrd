@@ -15,7 +15,7 @@ interface Props {
 
 export function Sidebar({ view, status, ledger, map }: Props): JSX.Element {
   return (
-    <aside className="wyrd-sidebar" style={{ flex: "1 1 340px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+    <aside className="wyrd-sidebar">
       <WhereYouAre roomName={view.room.name} map={map} />
       <EnemyCard enemy={view.enemy} />
       <YouPanel view={view} />
