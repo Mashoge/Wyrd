@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 import { shortCommit } from "../format";
+import { SoundToggle } from "./SoundToggle";
 
 interface Props {
   commitment: string;
@@ -7,9 +8,11 @@ interface Props {
   inspectorOn?: boolean;
   onToggleInspector?: () => void;
   onOpenHelp?: () => void;
+  soundOn?: boolean;
+  onToggleSound?: () => void;
 }
 
-export function Header({ commitment, verified, inspectorOn = false, onToggleInspector, onOpenHelp }: Props): JSX.Element {
+export function Header({ commitment, verified, inspectorOn = false, onToggleInspector, onOpenHelp, soundOn = true, onToggleSound }: Props): JSX.Element {
   return (
     <header
       style={{
@@ -34,6 +37,7 @@ export function Header({ commitment, verified, inspectorOn = false, onToggleInsp
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        {onToggleSound !== undefined && <SoundToggle soundOn={soundOn} onToggle={onToggleSound} />}
         <button
           type="button"
           aria-label="How to play"

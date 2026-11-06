@@ -1,5 +1,5 @@
 import type { Easing } from "framer-motion";
-import type { DiceRoll, ToolLogEntry } from "./api";
+import type { DiceRoll, PlayerViewEnemy, ToolLogEntry } from "./api";
 import { shortRefusalReason } from "./format";
 
 /** Snappy overshoot easing from docs/UI_STYLE.md section 5. Never skew text. */
@@ -172,5 +172,49 @@ export class FirstVisitTracker {
   hasSeen(roomId: string): boolean {
     return this.seen.has(roomId);
   }
+}
+
+/* First-encounter cut-in detection */
+
+/**
+ * Tracks enemies already met per game. Seed it on start/resume with the
+ * enemy currently present (if any) so resuming beside an enemy does not
+ * replay its cut-in; afterwards each new enemy id triggers exactly once.
+ */
+export class FirstEncounterTracker {
+  private gameKey: string | null = null;
+  private seen = new Set<string>();
+
+  beginGame(gameKey: string, seedEnemyIds: Iterable<string> = []): void {
+    this.gameKey = gameKey;
+    this.seen = new Set(seedEnemyIds);
+  }
+
+  /**
+   * The enemy earning a cut-in right now, or null. Marks it seen, so each
+   * enemy triggers exactly once per game. A new gameKey resets (unseeded).
+   */
+  trigger(gameKey: string, enemy: PlayerViewEnemy | null): PlayerViewEnemy | null {
+    if (this.gameKey !== gameKey) {
+      this.gameKey = gameKey;
+      this.seen = new Set<string>();
+    }
+    const hit = cutInEnemy(enemy, this.seen);
+    if (hit !== null) this.seen.add(hit.id);
+    return hit;
+  }
+}
+
+/**
+ * Pure: which enemy (if any) earns an encounter cut-in given the enemy now
+ * present and the ids already seen. Null for no enemy, an already-seen
+ * enemy, or an already-defeated enemy (its card alone is enough).
+ */
+export function cutInEnemy(
+  enemy: PlayerViewEnemy | null,
+  seenEnemyIds: ReadonlySet<string>,
+): PlayerViewEnemy | null {
+  if (enemy === null || enemy.defeated) return null;
+  return seenEnemyIds.has(enemy.id) ? null : enemy;
 }
 

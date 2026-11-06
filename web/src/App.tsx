@@ -15,7 +15,9 @@ import { TipQueue, detectTips, hasSeenIntro, type Tip } from "./guidance";
 import { IntroModal } from "./components/IntroModal";
 import { HelpPanel } from "./components/HelpPanel";
 import { TipCard } from "./components/TipCard";
-import { FirstVisitTracker } from "./key-moments";
+import { FirstEncounterTracker, FirstVisitTracker } from "./key-moments";
+import { isSoundOn, playSound, setSoundOn, unlockAudio } from "./sound";
+import { EncounterCutIn } from "./components/EncounterCutIn";
 import { RoomTitleCard } from "./components/RoomTitleCard";
 
 const INSPECTOR_STORAGE_KEY = "wyrd.inspector";
@@ -83,6 +85,30 @@ export function App(): JSX.Element {
   const firstVisitRef = useRef<FirstVisitTracker>(new FirstVisitTracker());
   const roomCardSeq = useRef(0);
   const [roomCard, setRoomCard] = useState<{ name: string; key: number } | null>(null);
+  // Encounter cut-in: first-meeting detection per game (seeded on load).
+  const encounterRef = useRef<FirstEncounterTracker>(new FirstEncounterTracker());
+  const encounterSeq = useRef(0);
+  const [encounterCard, setEncounterCard] = useState<{ enemy: NonNullable<LoadedGame["view"]["enemy"]>; key: number } | null>(null);
+  const [soundOnState, setSoundOnState] = useState<boolean>(() => isSoundOn());
+
+  // Audio unlocks on the first user interaction; never plays before that.
+  useEffect(() => {
+    const unlock = (): void => unlockAudio();
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, []);
+
+  const toggleSound = useCallback((): void => {
+    setSoundOnState((prev) => {
+      const next = !prev;
+      setSoundOn(next);
+      return next;
+    });
+  }, []);
   // Guidance: tip entries accumulate across turns; only successful turns add.
   const guidanceEntriesRef = useRef<ToolLogEntry[]>([]);
   // True while the first-view intro is up, so tips do not pop in behind it.
@@ -105,6 +131,9 @@ export function App(): JSX.Element {
       if (!firstVisitRef.current.hasSeen(g.view.room.id)) {
         firstVisitRef.current.observe(g.gameId, g.view.room.id);
       }
+      // Seed with the enemy already present so start/resume never cut-ins.
+      encounterRef.current.beginGame(g.gameId, g.view.enemy !== null ? [g.view.enemy.id] : []);
+      setEncounterCard(null);
       setRoomCard(null);
       saveGameId(g.gameId);
       const resolved = resolveStoredCommitment(g.gameId, g.commitment);
@@ -142,10 +171,23 @@ export function App(): JSX.Element {
     if (firstVisitRef.current.observe(game.gameId, game.view.room.id)) {
       roomCardSeq.current += 1;
       setRoomCard({ name: game.view.room.name, key: roomCardSeq.current });
+      playSound("room");
+    }
+  }, [game, booting]);
+
+  // Encounter cut-in: fires once per enemy per game (seeded on load above).
+  useEffect(() => {
+    if (game === null || booting) return;
+    const enemy = encounterRef.current.trigger(game.gameId, game.view.enemy);
+    if (enemy !== null) {
+      encounterSeq.current += 1;
+      setEncounterCard({ enemy, key: encounterSeq.current });
+      playSound("encounter");
     }
   }, [game, booting]);
 
   const dismissRoomCard = useCallback((): void => setRoomCard(null), []);
+  const dismissEncounter = useCallback((): void => setEncounterCard(null), []);
 
   const closeTip = useCallback((): void => {
     tipQueue.closeCurrent();
@@ -389,6 +431,8 @@ export function App(): JSX.Element {
     game, turns, ledger, suggestions, busy, inspectorOn, booting, bootPhase, bootFresh, bootCommitment, bootSlow, error, over, won, storyScrollRef, onStoryScroll: handleStoryScroll, sendAction, retryTurn, retryBoot: boot, newGame, markVerified, onToggleInspector: toggleInspector,
     introOpen, helpOpen, currentTip, onCloseIntro: closeIntro, onOpenHelp: openHelp, onCloseHelp: closeHelp, onCloseTip: closeTip,
     roomCard, onDismissRoomCard: dismissRoomCard,
+    encounterCard, onDismissEncounter: dismissEncounter,
+    soundOn: soundOnState, onToggleSound: toggleSound,
   });
 }
 
@@ -423,17 +467,21 @@ interface LayoutArgs {
   onCloseTip: () => void;
   roomCard: { name: string; key: number } | null;
   onDismissRoomCard: () => void;
+  encounterCard: { enemy: NonNullable<PlayerView["enemy"]>; key: number } | null;
+  onDismissEncounter: () => void;
+  soundOn: boolean;
+  onToggleSound: () => void;
 }
 
 function AppLayout(args: LayoutArgs): JSX.Element {
-  const { game, turns, ledger, suggestions, busy, inspectorOn, booting, bootPhase, bootFresh, bootCommitment, bootSlow, error, over, won, storyScrollRef, onStoryScroll, sendAction, retryTurn, retryBoot, newGame, markVerified, onToggleInspector, introOpen, helpOpen, currentTip, onCloseIntro, onOpenHelp, onCloseHelp, onCloseTip, roomCard, onDismissRoomCard } = args;
+  const { game, turns, ledger, suggestions, busy, inspectorOn, booting, bootPhase, bootFresh, bootCommitment, bootSlow, error, over, won, storyScrollRef, onStoryScroll, sendAction, retryTurn, retryBoot, newGame, markVerified, onToggleInspector, introOpen, helpOpen, currentTip, onCloseIntro, onOpenHelp, onCloseHelp, onCloseTip, roomCard, onDismissRoomCard, encounterCard, onDismissEncounter, soundOn, onToggleSound } = args;
   const inspectorTurns: InspectorTurn[] = turns
     .filter((t) => !t.pending && !t.failed)
     .map((t) => ({ id: t.id, playerText: t.playerText, toolLog: t.toolLog, meta: t.meta ?? null }));
   return (
     <div className="wyrd-app">
       <div className="wyrd-app-inner">
-        {game !== null && <Header commitment={game.commitment} verified={game.verified} inspectorOn={inspectorOn} onToggleInspector={onToggleInspector} onOpenHelp={onOpenHelp} />}
+        {game !== null && <Header commitment={game.commitment} verified={game.verified} inspectorOn={inspectorOn} onToggleInspector={onToggleInspector} onOpenHelp={onOpenHelp} soundOn={soundOn} onToggleSound={onToggleSound} />}
         <div className="font-rune" aria-hidden="true" style={runeStyle}>
           ᚹ ᚣ ᚱ ᛞ ᛫ ᚠ ᚨ ᛏ ᛖ ᛫ ᚹ ᚣ ᚱ ᛞ ᛫ ᚠ ᚨ ᛏ ᛖ ᛫ ᚹ ᚣ ᚱ ᛞ
         </div>
@@ -454,12 +502,17 @@ function AppLayout(args: LayoutArgs): JSX.Element {
             <main
               className="wyrd-main"
               style={{ position: "relative" }}
-              onClick={roomCard !== null ? onDismissRoomCard : undefined}
+              onClick={roomCard !== null || encounterCard !== null ? () => { onDismissRoomCard(); onDismissEncounter(); } : undefined}
             >
               <RoomTitleCard
                 roomName={roomCard?.name ?? null}
                 cardKey={roomCard?.key ?? 0}
                 onDone={onDismissRoomCard}
+              />
+              <EncounterCutIn
+                enemy={encounterCard?.enemy ?? null}
+                cutKey={encounterCard?.key ?? 0}
+                onDone={onDismissEncounter}
               />
               <div
                 ref={storyScrollRef}

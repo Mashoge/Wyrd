@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { DiceRoll, ToolLogEntry } from "./api";
+import type { DiceRoll, PlayerViewEnemy, ToolLogEntry } from "./api";
 import {
   CORAL,
+  FirstEncounterTracker,
   FirstVisitTracker,
   MINT,
   VIOLET,
+  cutInEnemy,
   refusalForTurn,
   rejectedEntries,
   rollDisplay,
@@ -14,6 +16,7 @@ import {
   turnHasRefusal,
 } from "./key-moments";
 import { DiceCutIn } from "./components/DiceCutIn";
+import { EncounterCutIn } from "./components/EncounterCutIn";
 import { RoomTitleCard } from "./components/RoomTitleCard";
 import { StoryFeed } from "./components/StoryFeed";
 
@@ -136,7 +139,55 @@ describe("FirstVisitTracker", () => {
   });
 });
 
+function foe(partial: Partial<PlayerViewEnemy> = {}): PlayerViewEnemy {
+  return {
+    id: "goblin", name: "Goblin", quirk: "keeps counting its coins",
+    passed: false, defeated: false, condition: "unhurt", ...partial,
+  };
+}
+
+describe("encounter cut-in selection", () => {
+  it("cutInEnemy: first meeting only; null for none/seen/defeated", () => {
+    expect(cutInEnemy(null, new Set())).toBeNull();
+    expect(cutInEnemy(foe(), new Set())?.id).toBe("goblin");
+    expect(cutInEnemy(foe(), new Set(["goblin"]))).toBeNull();
+    expect(cutInEnemy(foe({ defeated: true, condition: "defeated" }), new Set())).toBeNull();
+    expect(cutInEnemy(foe({ id: "bone_troll" }), new Set(["goblin"]))?.id).toBe("bone_troll");
+  });
+
+  it("tracker triggers exactly once per enemy per game", () => {
+    const t = new FirstEncounterTracker();
+    t.beginGame("g1");
+    expect(t.trigger("g1", foe())?.id).toBe("goblin");
+    expect(t.trigger("g1", foe())).toBeNull(); // still standing there
+    expect(t.trigger("g1", null)).toBeNull();
+    expect(t.trigger("g1", foe({ id: "bone_troll", name: "Bone Troll" }))?.id).toBe("bone_troll");
+    expect(t.trigger("g2", foe())?.id).toBe("goblin"); // new game: meets again
+  });
+
+  it("seeding on start/resume suppresses the present enemy only", () => {
+    const t = new FirstEncounterTracker();
+    t.beginGame("g1", ["goblin"]); // resumed beside the goblin
+    expect(t.trigger("g1", foe())).toBeNull();
+    expect(t.trigger("g1", foe({ id: "bone_troll" }))?.id).toBe("bone_troll");
+  });
+});
+
 describe("key-moment rendering", () => {
+  it("renders the encounter cut-in: portrait, big name, quirk, non-blocking", () => {
+    const html = renderToStaticMarkup(<EncounterCutIn enemy={foe()} cutKey={1} onDone={() => {}} />);
+    expect(html).toContain('src="/portraits/goblin.webp"');
+    expect(html).toContain("Goblin");
+    expect(html).toContain("keeps counting its coins.");
+    expect(html).toContain("Encounter");
+    expect(html).toContain(CORAL);
+    expect(html).toContain("#1A1421");
+    expect(html).toContain("pointer-events:none");
+    expect(html).toContain("clip-path");
+    expect(html).not.toContain("skew");
+    expect(renderToStaticMarkup(<EncounterCutIn enemy={null} cutKey={0} onDone={() => {}} />)).not.toContain("Goblin");
+  });
+
   it("stamps REFUSED beside the player line with the short reason below", () => {
     const html = renderToStaticMarkup(
       <StoryFeed
