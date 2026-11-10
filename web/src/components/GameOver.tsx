@@ -3,6 +3,7 @@ import type { CSSProperties, JSX } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { SealMark } from "./SealMark";
 import { EASE, animDur } from "./SealMark";
+import { playSound, soundForStatus } from "../sound";
 import { useGameOver } from "./useGameOver";
 import type { GameOverPhase } from "./useGameOver";
 import type { RevealResponse } from "../verify";
@@ -51,6 +52,16 @@ export function GameOverView({ phase, reveal, browserHash, canonical, storedComm
   useEffect(() => {
     if (verified) onVerified();
   }, [verified, onVerified]);
+
+  // Seal crack on the verify reveal; victory/defeat when the result lands.
+  useEffect(() => {
+    if (verified || broken) playSound("seal");
+  }, [verified, broken]);
+  useEffect(() => {
+    const s = soundForStatus(won ? "won" : "lost");
+    if (s !== null) playSound(s);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     setShowProof(false);

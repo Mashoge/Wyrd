@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { JSX } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import type { ToolLogEntry, TurnMeta } from "../api";
 import { MUTED, refusalForTurn } from "../key-moments";
+import { playSound, soundsForTurn } from "../sound";
 import { DiceCutIn } from "./DiceCutIn";
 import { RefusedStamp } from "./RefusedStamp";
 import { RollRows } from "./RollRows";
@@ -43,6 +44,20 @@ export function StoryFeed({ turns, onRetry }: Props): JSX.Element {
   const reduceMotion = useReducedMotion();
   // A click anywhere in the feed skips running cut-in animations.
   const [skipSignal, setSkipSignal] = useState(0);
+  // Synced with the REFUSED stamp landing on the newest refused turn.
+  const refusedTurnId = turns[turns.length - 1]?.id;
+  const refusedKey = turns.some((t) => t.id === refusedTurnId && refusalForTurn(t.toolLog) !== null) ? refusedTurnId : null;
+  // Sounds the cut-ins don't own: REFUSED (synced with the stamp) and trap.
+  const playedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const latest = turns[turns.length - 1];
+    if (latest === undefined || latest.pending || latest.failed) return;
+    if (playedRef.current.has(latest.id)) return;
+    playedRef.current.add(latest.id);
+    const sounds = soundsForTurn(latest.toolLog);
+    if (sounds.includes("trap")) playSound("trap");
+    if (refusedKey === latest.id) playSound("refused");
+  }, [turns, refusedKey]);
   return (
     <div
       style={{ display: "flex", flexDirection: "column", gap: 18 }}

@@ -3,7 +3,8 @@ import type { JSX } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import type { DiceRoll } from "../api";
 import { formatRoll } from "../format";
-import { MUTED, SNAPPY_EASE, VIOLET, spinSequence, splitRolls } from "../key-moments";
+import { MUTED, SNAPPY_EASE, VIOLET, spinSequence, splitRolls, type RollTone } from "../key-moments";
+import { playSound } from "../sound";
 
 /**
  * Dice cut-in for the newest turn (UI_STYLE section 5): each check roll's
@@ -20,7 +21,7 @@ export function DiceCutIn({ rolls }: { rolls: DiceRoll[] }): JSX.Element | null 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {checks.map((d, i) => (
-        <RollCutIn key={`${d.label}-${i}`} value={d.value} sides={d.sides} label={d.label} neededText={d.neededText} toneColor={d.toneColor} />
+        <RollCutIn key={`${d.label}-${i}`} value={d.value} sides={d.sides} label={d.label} neededText={d.neededText} toneColor={d.toneColor} tone={d.tone} />
       ))}
       {others.map((r, i) => (
         <div key={`other-${i}`} style={{ fontFamily: "Inter, sans-serif", fontSize: 13, color: MUTED }}>
@@ -37,15 +38,25 @@ function RollCutIn({
   label,
   neededText,
   toneColor,
+  tone,
 }: {
   value: number;
   sides: number;
   label: string;
   neededText: string;
   toneColor: string;
+  tone: RollTone;
 }): JSX.Element {
   const reduced = useReducedMotion();
   const [frame, setFrame] = useState(0);
+  // Synced with the spin: dice ticks at mount, hit/miss as the number lands.
+  useEffect(() => {
+    playSound("dice");
+    if (tone === "partial") return;
+    const id = setTimeout(() => playSound(tone === "hit" ? "hit" : "miss"), reduced === true ? 0 : 300);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [seq] = useState<number[]>(() => spinSequence(value, sides, 6));
   const spinning = reduced !== true && frame < seq.length - 1;
   const shown = spinning ? (seq[frame] ?? value) : value;
